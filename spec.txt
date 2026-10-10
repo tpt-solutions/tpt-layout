@@ -1,0 +1,161 @@
+Design Spec: tpt-layout (Layer 3)
+1. Mission & Scope
+Mission: To provide a unified, pure-Rust, deterministic box and page layout engine. It implements CSS Flexbox, CSS Grid, absolute positioning, and page-break algorithms, enabling complex document layouts for PDFs (tpt-doc), web UIs (tpt-pwa), and CAD title blocks (tpt-vertex).
+Scope:
+In Scope: Box model (margin, border, padding, content), Flexbox layout, Grid layout, absolute/relative positioning, inline flow (wrapping boxes around text), page-break algorithms (avoiding orphans/widows), and multi-column layouts.
+Out of Scope: Text shaping and line-breaking (handled by tpt-text), vector path construction (handled by tpt-canvas), CSS parsing (handled by downstream apps), and style resolution (handled by the application layer).
+2. Core Constraints & Architecture
+Zero C-FFI: 100% Pure Rust. No linking to WebKit, Gecko, or browser engines.
+no_std + alloc: The core layout math must run in no_std environments (WASM, embedded).
+Deterministic: Given the same input boxes, constraints, and styles, the layout output must be byte-for-byte identical across all platforms. This is non-negotiable for PDF generation—a document laid out on a server must produce the exact same page breaks when rendered on a client.
+Incremental Layout: Support partial re-layout when only a subset of the document changes (critical for real-time editing in tpt-doc and tpt-pwa).
+The Dependency Map
+Text Layout: tpt-text (Provides paragraph layout, line-breaking, and glyph metrics).
+Vector API: tpt-canvas (Provides the drawing context where laid-out boxes are rendered).
+Math: tpt-math (For constraint solving and geometric calculations).
+3. Core Modules & API Design
+Module A: tpt_layout::box_model (The Box Tree)
+The fundamental data structure. Every element in the document is a box with constraints.
+Box Node: Represents a single layout element with properties: width, height, min_width, max_width, margin, border, padding, position (relative/absolute/static), and display (block/flex/grid/inline).
+Box Tree: A tree of BoxNodes representing the document structure. Each node can have children.
+Key Struct:
+pub struct BoxNode {
+    pub id: NodeId,
+    pub style: BoxStyle,
+    pub children: Vec<NodeId>,
+    pub parent: Option<NodeId>,
+    // Computed layout (filled in by the layout engine)
+    pub layout: ComputedLayout,
+}
+
+pub struct ComputedLayout {
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+    pub baseline: f32, // For inline alignment
+}
+Module B: tpt_layout::flexbox (Flex Layout)
+Implements the CSS Flexbox specification for 1D layouts (rows and columns).
+Flex Container: Defines the main axis (row/column), cross axis, alignment (justify-content, align-items), and wrapping behavior.
+Flex Items: Each child has flex-grow, flex-shrink, flex-basis, and alignment overrides.
+Layout Algorithm:
+Determine the main size of each item (based on flex-basis and available space).
+Distribute free space using flex-grow and flex-shrink.
+Position items along the main axis using justify-content.
+Position items along the cross axis using align-items and align-self.
+Key Function:
+pub fn layout_flexbox(
+    container: &mut BoxNode,
+    children: &mut [BoxNode],
+    available_width: f32,
+    available_height: f32,
+);
+Module C: tpt_layout::grid (Grid Layout)
+Implements the CSS Grid specification for 2D layouts.
+Grid Container: Defines rows, columns, gaps, and template areas.
+Grid Items: Each child specifies grid-row, grid-column, grid-area, and alignment.
+Layout Algorithm:
+Determine the size of each track (row/column) based on minmax(), fr units, and content.
+Place items into the grid cells based on their grid-row/grid-column properties.
+Handle auto-placement for items without explicit positions.
+Apply alignment within cells.
+Key Function:
+pub fn layout_grid(
+    container: &mut BoxNode,
+    children: &mut [BoxNode],
+    available_width: f32,
+    available_height: f32,
+);
+Module D: tpt_layout::flow (Inline & Block Flow)
+Handles the traditional document flow—block elements stack vertically, inline elements wrap horizontally.
+Block Flow: Children are laid out top-to-bottom, each taking the full width (unless constrained).
+Inline Flow: Children are laid out left-to-right, wrapping to the next line when they exceed the container width. Integrates with tpt-text for text runs.
+Float & Clear: Supports floating boxes to the left/right, with subsequent content wrapping around them.
+Key Function:
+pub fn layout_flow(
+    container: &mut BoxNode,
+    children: &mut [BoxNode],
+    available_width: f32,
+);
+Module E: tpt_layout::page (Page Break & Pagination)
+The engine that splits a continuous document into discrete pages (critical for tpt-doc PDF generation).
+Page Constraints: Defines page size (A4, Letter, etc.), margins, and header/footer regions.
+Break Rules: Implements break-before, break-after, and break-inside (avoid, always, left, right).
+Orphan/Widow Protection: Ensures that at least N lines of a paragraph appear at the top/bottom of a page.
+Pagination Algorithm:
+Lay out the document as a single continuous flow.
+Walk through the laid-out boxes, accumulating height.
+When the accumulated height exceeds the page height, insert a page break at the last valid break point (respecting break-inside: avoid).
+Adjust the y coordinates of all boxes to account for the page offset.
+Key Struct:
+pub struct PageLayout {
+    pub pages: Vec<Page>,
+    pub total_height: f32,
+}
+
+pub struct Page {
+    pub width: f32,
+    pub height: f32,
+    pub content_offset_y: f32, // Where this page starts in the continuous flow
+    pub boxes: Vec<NodeId>, // Boxes that appear on this page
+}
+Module F: tpt_layout::engine (The Layout Orchestrator)
+The top-level engine that coordinates all layout modes.
+Layout Context: Holds global state like font metrics (from tpt-text), DPI, and layout constraints.
+Incremental Layout: Tracks which boxes have changed and only re-layouts the affected subtree.
+Key Function:
+pub fn layout_document(
+    root: &mut BoxNode,
+    all_nodes: &mut [BoxNode],
+    constraints: &LayoutConstraints,
+    ctx: &LayoutContext,
+) -> LayoutResult;
+4. The Processing Pipeline
+How a PDF document is laid out:
+Box Tree Construction: The application (e.g., tpt-doc) builds a tree of BoxNodes representing the document structure (headings, paragraphs, images, tables).
+Style Resolution: Each box is assigned a BoxStyle (margins, padding, display mode, flex/grid properties).
+Text Layout: For boxes containing text, tpt-text is called to shape the text and calculate line heights and baselines.
+Layout Pass: tpt_layout::engine::layout_document is called. It walks the tree:
+For flex containers, it calls layout_flexbox.
+For grid containers, it calls layout_grid.
+For block/inline containers, it calls layout_flow.
+Each box's ComputedLayout (x, y, width, height) is filled in.
+Pagination: If the document is paginated (e.g., a PDF), tpt_layout::page::paginate is called to split the continuous layout into discrete pages.
+Rendering: The laid-out box tree is passed to tpt-canvas, which draws each box at its computed (x, y) position.
+5. Integration with the TPT Ecosystem
+tpt-doc (PDF/OOXML): The primary consumer. Uses tpt-layout to position headings, paragraphs, images, and tables on A4/Letter pages. The deterministic pagination ensures that a PDF generated on a server has the exact same page breaks as one generated on a client.
+tpt-pwa (Web UI): Uses Flexbox and Grid layout to position UI elements (buttons, forms, cards) in the web frontend.
+tpt-vertex (CAD): Uses tpt-layout to position 2D annotations, dimension labels, and title blocks on CAD drawings.
+tpt-text: tpt-layout calls tpt-text to calculate the size of text boxes. tpt-text returns the line heights and baselines, which tpt-layout uses to position the text vertically.
+tpt-canvas: After layout, tpt-canvas draws each box at its computed position. tpt-layout doesn't draw anything—it only calculates positions.
+6. Testing & Quality Strategy
+Golden File Layout Testing: Using tpt-testkit::golden, we lay out complex documents (multi-page PDFs with tables, images, and text) and save the computed box positions as JSON golden files. Any change in the layout algorithm fails the test.
+Deterministic Pagination Testing: We lay out the same document on Linux, macOS, and Windows, and assert that the page breaks occur at the exact same positions.
+Flexbox/Grid Conformance: We test against the official CSS Flexbox and Grid test suites (adapted for our Rust API) to ensure spec compliance.
+Incremental Layout Performance: Using tpt-testkit::bench, we measure the time to re-layout a document after changing a single box. The incremental layout should be 10x faster than a full re-layout.
+7. Roadmap & Milestones
+Phase 1: Box Model & Block Flow (Weeks 1-3)
+Implement BoxNode, BoxStyle, and ComputedLayout.
+Implement basic block flow (vertical stacking).
+Integrate tpt-text for text box sizing.
+Milestone: Can lay out a simple document with headings and paragraphs.
+Phase 2: Flexbox (Weeks 4-6)
+Implement the Flexbox layout algorithm (main/cross axis, grow/shrink, alignment).
+Support wrapping and multi-line flex containers.
+Milestone: Can lay out complex 1D UI layouts (toolbars, card grids).
+Phase 3: Grid & Inline Flow (Weeks 7-9)
+Implement the Grid layout algorithm (tracks, placement, auto-flow).
+Implement inline flow with text wrapping and floats.
+Milestone: Can lay out 2D grids and documents with inline images.
+Phase 4: Pagination (Weeks 10-12)
+Implement the page-break algorithm (break-before/after/inside, orphan/widow protection).
+Implement multi-column layouts.
+Milestone: tpt-doc can generate paginated PDFs with correct page breaks.
+Phase 5: Incremental Layout & Polish (Weeks 13-14)
+Implement incremental layout (track changed boxes, re-layout only affected subtrees).
+Final conformance testing and performance optimization.
+Publish v1.0.0.
+Architect's Note
+The most dangerous trap in layout engines is constraint solving loops. Flexbox and Grid have complex interactions (e.g., a flex item's size depends on its content, but its content's size depends on the flex item's size). If you're not careful, the layout engine can enter an infinite loop or produce non-deterministic results.
+To prevent this, tpt-layout enforces a strict rule: Layout is a single-pass, top-down algorithm with explicit constraint resolution. We never iterate to convergence. Instead, we resolve constraints in a specific order (e.g., resolve flex-basis first, then distribute free space, then apply alignment). This guarantees that the layout is deterministic and terminates in a single pass.
