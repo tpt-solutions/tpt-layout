@@ -8,6 +8,7 @@ Separate crates built on tpt-layout. The core crate stays dependency-free, so ea
 | [spec](spec/) | `tpt-layout-spec`: a JSON description of a box tree, built and laid out, with SVG and layout JSON output. |
 | [cli](cli/) | `tpt-layout-cli`: a command-line tool over the spec crate. |
 | [web](web/) | `tpt-layout-web`: WebAssembly bindings and a browser playground. |
+| [text](text/) | `tpt-layout-text`: a `TextMeasurer` backed by tpt-text, for real font metrics and line breaking. |
 
 ## Build and test
 
@@ -16,6 +17,7 @@ cd tools/spec && cargo test
 cd tools/cli && cargo run -- svg sample.json -o sample.svg
 cd tools/cli && cargo run -- layout sample.json
 cd tools/web && cargo test
+cd tools/text && cargo test    # fetches tpt-text from GitHub, pinned to a commit
 ```
 
 ## Playground

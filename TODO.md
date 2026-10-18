@@ -98,7 +98,9 @@ Status: `[x]` is done and tested. `[ ]` is not done. Notes after an item say wha
 
 ## Open items to confirm later
 - [x] Final Rust API shape for tables and RTL (not in spec). Decided: keep the current names. Tables use `Display::Table`, `TableRow` and `TableCell`; RTL is `BoxStyle::direction`. Recorded in CHANGELOG.md.
-- [ ] Real tpt-text / tpt-canvas / tpt-math integration. **Decision, per the spec:** tpt-text is needed for real documents, and tpt-canvas is optional. tpt-math is not needed.
+- [x] tpt-text integration: `tools/text` (`tpt-layout-text`) implements `TextMeasurer` with tpt-text, pinned to commit `dc8f578` of `tpt-solutions/tpt-text`. Tests use the Noto Sans font from tpt-text's fixtures (SIL OFL 1.1, copied with its license). tpt-text breaks a word that is wider than the box inside the word, and the adapter passes those pieces on.
+- [ ] tpt-canvas: **Decision: not yet.** `tpt-solutions/tpt-canvas` exists on GitHub, but it holds only a spec and a TODO, with no code. Layout never draws, and `svg::SvgCanvas` already implements our `Canvas` trait. Revisit once it has an implementation.
+- [ ] tpt-math: **Decision: no dependency.** It is a large multi-crate workspace with a release pending. The layout's arithmetic is its own fixed-point `Px`, and its `Edges` and `Rect` are small, so nothing here needs it. Revisit if a specific need appears after its release.
   - tpt-text (shaping, line breaking, glyph metrics) is what makes line breaks match a real font. Layout reads it only through `TextMeasurer`, so the integration is an adapter that implements that trait. It is blocked until the crate exists; it is not in this repository.
   - tpt-canvas is only a drawing API. Layout never draws, and `svg::SvgCanvas` already implements the `Canvas` trait, so there is no need for it yet.
   - tpt-math would only do constraint solving. The layout uses fixed-point arithmetic and has no constraints to solve, so there is nothing to integrate.

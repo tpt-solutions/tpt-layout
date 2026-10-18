@@ -69,13 +69,16 @@ jobs:
         with:
           workspaces: "tools/spec -> tools/spec/target
 tools/cli -> tools/cli/target
-tools/web -> tools/web/target"
+tools/web -> tools/web/target
+tools/text -> tools/text/target"
       - name: Test spec
         run: cargo test --manifest-path tools/spec/Cargo.toml
       - name: Test cli
         run: cargo test --manifest-path tools/cli/Cargo.toml
       - name: Test web
         run: cargo test --manifest-path tools/web/Cargo.toml
+      - name: Test text (tpt-text adapter)
+        run: cargo test --manifest-path tools/text/Cargo.toml
       - name: Build web for wasm32
         run: cargo build --manifest-path tools/web/Cargo.toml --target wasm32-unknown-unknown --release
 

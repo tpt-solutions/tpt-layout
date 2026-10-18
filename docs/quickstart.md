@@ -16,7 +16,8 @@ let measurer = FixedAdvanceMeasurer::new(Px::from_px(8), Px::from_px(16), Px::fr
 let ctx = LayoutContext::new(&measurer);
 ```
 
-For real output, implement `TextMeasurer` for your font. See [text-measurer.md](text-measurer.md).
+For real output, use a font-backed measurer. `tools/text` (`tpt-layout-text`) is one, built on tpt-text.
+To write your own, see [text-measurer.md](text-measurer.md).
 
 ## 2. Build a box tree
 

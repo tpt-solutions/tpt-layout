@@ -1,0 +1,16 @@
+[package]
+name = "tpt-layout-text"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+authors = ["TPT Solutions"]
+description = "Connects tpt-layout to tpt-text: real font metrics and line breaking for the layout engine"
+publish = false
+
+# Not part of the core crate's workspace: the core stays dependency-free.
+[workspace]
+
+[dependencies]
+tpt-layout = { path = "../.." }
+# tpt-text is not on crates.io. It is pinned to a commit so builds are reproducible.
+tpt-text = { git = "https://github.com/tpt-solutions/tpt-text", rev = "dc8f578d4b76c98d3a50c2cbfb03f6675f67ca99" }

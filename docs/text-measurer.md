@@ -13,6 +13,11 @@ It breaks `text` into lines no wider than `max_width` and reports each line:
 - `baseline`: the distance from the top of the line to its baseline.
 - `text`: the byte range of `text` that the line shows. Leave out the space the line breaks at.
 
+## A ready-made implementation
+
+`tools/text` (`tpt-layout-text`) implements this trait with tpt-text, which does shaping, bidi and
+UAX #14 line breaking. Its `TextEngine` is the reference to read when writing your own.
+
 ## Rules the engine relies on
 
 - **Deterministic.** The same input must give the same output on every platform. The determinism
