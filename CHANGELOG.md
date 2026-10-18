@@ -46,6 +46,7 @@ Complete implementation of the layout engine. Not published: see TODO.md.
 - `LineBox` has a `text` byte range, so renderers can draw each line's characters. `LineBox` is no
   longer `Copy`.
 - `Direction` and `TextAlign` have an `Inherit` default and are inherited from the containing block.
+- Multi-column: a block of inline text splits between its lines at a column boundary.
 - Pagination: a header row (`table_header` on the row) now repeats on continuation pages. Before, only
   a flagged cell counted.
 - Pagination: blocks whose children are all inline split between their lines, with orphan and widow

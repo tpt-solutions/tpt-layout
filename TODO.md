@@ -110,7 +110,7 @@ Plan: `C:\Users\phill\.claude\plans\review-platform-for-bugs-optimized-allen.md`
 - [x] Merged duplicated Added/Fixed sections under 1.0.0 in CHANGELOG.md
 - [x] `tree.rs` `push`: the `u32` overflow `expect` is the only library panic path. Decided to keep: it needs more than 4 billion nodes. Revisit if `insert` ever returns `Result`
 - [x] Multi-column (`pagination.rs`): negative column width with a large gap is clamped to zero, and the balanced-height arithmetic saturates. Test: `oversized_column_gap_clamps_instead_of_going_negative`
-- [ ] Multi-column: children are still not split across columns (a tall child is balanced whole)
+- [x] Multi-column: a block of inline text is split between its lines at a column boundary, keeping orphans and widows. Other children (block text leaves, inline elements, inline-blocks, nested boxes) still move whole. Tests: `tests/multicolumn_split.rs`
 - [x] Slot reuse in `BoxTree::remove`: free list plus per-node generations, so stale ids resolve to `None`. Tests in `tests/tree_edit.rs`
 - [x] Tracks beyond `MAX_TRACKS`: the review said these were silently dropped, but `Tracks::new` already panics with a message. Added `Tracks::try_new`, which returns `None` instead
 - [x] `BoxTree` move/insert API: `insert_child_at`, `insert_before`, `detach`, `reparent`. Tests in `tests/tree_edit.rs`

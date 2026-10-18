@@ -15,7 +15,8 @@
 //! - Tables: header rows (`table_header`) repeat at the top of each page the table continues to.
 //!
 //! Multi-column layout lays out a container's block children at column width, then fills the
-//! columns greedily to a balanced height. Children are never split across columns.
+//! columns greedily to a balanced height. A block of inline text is split between its lines when it
+//! crosses a column boundary; other children move whole.
 //!
 //! Running headers and footers reserve space with `header_height` and `footer_height`, and
 //! [`PageLayout::place_running`] adds the same header and footer nodes to every page.
@@ -626,14 +627,36 @@ pub(crate) fn layout_columns(
         })
         .collect();
 
-    // Greedy fill: a child that overflows the target starts the next column.
+    // Greedy fill. A child that overflows the target starts the next column, unless it is a block
+    // of inline text, which is split between its lines instead.
     let mut column_index = 0;
     let mut column_start = top;
     let mut column_has_child = false;
     let mut bottom = top;
     for (child, child_top, child_bottom) in children {
+        let overflows = child_bottom - column_start > target && column_index + 1 < count;
+        if overflows {
+            if let Some((boundary, _)) = split_point(tree, child, column_start, target) {
+                let head_dx = column_width * column_index + gap * column_index;
+                let head_dy = top - column_start;
+                let tail_dx = column_width * (column_index + 1) + gap * (column_index + 1);
+                let tail_dy = top - boundary;
+                split_text_block(
+                    tree,
+                    child,
+                    boundary,
+                    (head_dx, head_dy),
+                    (tail_dx, tail_dy),
+                );
+                column_index += 1;
+                column_start = boundary;
+                column_has_child = true;
+                bottom = bottom.max(child_bottom + tail_dy);
+                continue;
+            }
+        }
         // A column always takes at least one child, so the first child never starts a new one.
-        if column_has_child && child_bottom - column_start > target && column_index + 1 < count {
+        if column_has_child && overflows {
             column_index += 1;
             column_start = child_top;
         }
@@ -644,4 +667,110 @@ pub(crate) fn layout_columns(
         bottom = bottom.max(child_bottom + dy);
     }
     (bottom, Margin::ZERO, baseline)
+}
+
+/// Where a block of inline text can be split between columns: the boundary (the top of the first
+/// line of the next column) and the number of lines kept in the current column. The split keeps
+/// `orphans` and `widows` lines on either side. `None` when the child cannot be split.
+///
+/// Only blocks whose children are all inline text leaves are split. Other children move whole.
+fn split_point(tree: &BoxTree, child: NodeId, column_start: Px, target: Px) -> Option<(Px, usize)> {
+    let node = tree.get(child)?;
+    if node.text.is_some() || node.lines.is_empty() {
+        return None;
+    }
+    let laid = tree.laid_children(child);
+    let inline_text_only = !laid.is_empty()
+        && laid.iter().all(|c| {
+            tree.get(*c)
+                .is_some_and(|n| n.text.is_some() && n.style.display.is_inline_level())
+        });
+    if !inline_text_only {
+        return None;
+    }
+    let frame = tree.frame(child)?;
+    let style = node.style;
+    let sides = Sides::of(&style, Px::ZERO);
+    let content_top = frame.y + sides.border.top + sides.padding.top;
+    let orphans = style.orphans as usize;
+    let widows = style.widows as usize;
+    let total = node.lines.len();
+    let mut best = None;
+    let mut boundary = content_top;
+    for (index, line) in node.lines.iter().enumerate() {
+        boundary += line.height;
+        let kept = index + 1;
+        if boundary - column_start <= target
+            && kept >= orphans
+            && kept < total
+            && total - kept >= widows
+        {
+            best = Some((boundary, kept));
+        }
+    }
+    best
+}
+
+/// Moves the text of a block split by [`split_point`]. Fragments above `boundary` move by
+/// `head`, the rest by `tail`. Each text leaf's frame becomes the bounds of its fragments, and the
+/// block's frame becomes the bounds of its text. The block's `lines` are left as they were.
+fn split_text_block(
+    tree: &mut BoxTree,
+    child: NodeId,
+    boundary: Px,
+    head: (Px, Px),
+    tail: (Px, Px),
+) {
+    let leaves = tree.laid_children(child);
+    let mut bounds: Option<(Px, Px, Px, Px)> = None;
+    for leaf in leaves {
+        let Some(node) = tree.get(leaf) else {
+            continue;
+        };
+        let mut fragments = node.fragments.clone();
+        for fragment in &mut fragments {
+            let (dx, dy) = if fragment.y < boundary { head } else { tail };
+            fragment.x += dx;
+            fragment.y += dy;
+        }
+        let left = fragments.iter().map(|f| f.x).fold(Px::MAX, |a, x| a.min(x));
+        let top = fragments.iter().map(|f| f.y).fold(Px::MAX, |a, y| a.min(y));
+        let right = fragments
+            .iter()
+            .map(|f| f.x + f.width)
+            .fold(Px(i32::MIN), |a, x| a.max(x));
+        let bottom = fragments
+            .iter()
+            .map(|f| f.y + f.height)
+            .fold(Px(i32::MIN), |a, y| a.max(y));
+        if !fragments.is_empty() {
+            tree.set_frame(
+                leaf,
+                crate::tree::Frame {
+                    x: left,
+                    y: top,
+                    width: right - left,
+                    height: bottom - top,
+                    baseline: Px::ZERO,
+                },
+            );
+            bounds = Some(match bounds {
+                None => (left, top, right, bottom),
+                Some((l, t, r, b)) => (l.min(left), t.min(top), r.max(right), b.max(bottom)),
+            });
+        }
+        tree.set_fragments(leaf, fragments);
+    }
+    if let Some((left, top, right, bottom)) = bounds {
+        tree.set_frame(
+            child,
+            crate::tree::Frame {
+                x: left,
+                y: top,
+                width: right - left,
+                height: bottom - top,
+                baseline: Px::ZERO,
+            },
+        );
+    }
 }
