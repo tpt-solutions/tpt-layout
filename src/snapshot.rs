@@ -14,9 +14,13 @@ use crate::{
 /// Border-box geometry of one node, in fixed-point pixels.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Geometry {
+    /// Left edge.
     pub x: Px,
+    /// Top edge.
     pub y: Px,
+    /// Width.
     pub width: Px,
+    /// Height.
     pub height: Px,
 }
 
@@ -24,8 +28,11 @@ pub struct Geometry {
 /// side (added or removed).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Change {
+    /// The node that changed.
     pub node: NodeId,
+    /// Its geometry before, or `None` if it was absent.
     pub before: Option<Geometry>,
+    /// Its geometry after, or `None` if it is gone.
     pub after: Option<Geometry>,
 }
 

@@ -31,12 +31,14 @@ use crate::{
 /// Shared inputs for a layout pass.
 #[derive(Clone, Copy)]
 pub struct LayoutContext<'a> {
+    /// Measures text for every pass of a layout.
     pub measurer: &'a dyn TextMeasurer,
     /// Pixels per inch. Used to convert point sizes with [`LayoutContext::points`].
     pub dpi: u32,
 }
 
 impl<'a> LayoutContext<'a> {
+    /// Creates a context at the default 96 DPI.
     pub fn new(measurer: &'a dyn TextMeasurer) -> Self {
         LayoutContext { measurer, dpi: 96 }
     }
@@ -50,16 +52,20 @@ impl<'a> LayoutContext<'a> {
 /// The containing width and optional height the root is laid out in.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct LayoutConstraints {
+    /// Width of the root's containing block.
     pub width: Px,
+    /// Height of the containing block, if it is fixed. `None` lets the content set it.
     pub height: Option<Px>,
 }
 
 /// Summary of a layout pass. Per-box geometry is read from the tree.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct LayoutResult {
+    /// The root that was laid out.
     pub root: NodeId,
     /// Border-box width and height of the root.
     pub width: Px,
+    /// Border-box height of the root.
     pub height: Px,
 }
 

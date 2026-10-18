@@ -18,8 +18,11 @@ use crate::{
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// A box to paint, with its stacking order and clip region.
 pub struct PaintItem {
+    /// The box.
     pub node: NodeId,
+    /// Stacking order. Boxes with a higher value paint later.
     pub z_index: i32,
     /// Region the box is clipped to, or `None` when no ancestor clips it.
     pub clip: Option<Rect>,

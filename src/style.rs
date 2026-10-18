@@ -31,6 +31,7 @@ pub enum WritingMode {
 }
 
 impl WritingMode {
+    /// True for the vertical writing modes.
     pub fn is_vertical(self) -> bool {
         matches!(
             self,
@@ -43,17 +44,22 @@ impl WritingMode {
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+/// A length: automatic, a fixed number of px, or a percentage of the containing block.
 pub enum Dimension {
     #[default]
+    /// Chosen by the layout.
     Auto,
+    /// A fixed length.
     Length(Px),
     /// Hundredths of a percent (`5000` = 50%), resolved against a base length.
     Percent(i32),
 }
 
 impl Dimension {
+    /// A zero length.
     pub const ZERO: Dimension = Dimension::Length(Px::ZERO);
 
+    /// A fixed length in whole px.
     pub const fn px(px: i32) -> Self {
         Dimension::Length(Px::from_px(px))
     }
@@ -81,16 +87,24 @@ impl Dimension {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Display {
     #[default]
+    /// A block-level box, stacked in its container.
     Block,
     /// The box and its subtree take no space, paint nothing, and are not paginated. Its
     /// children are not laid out.
     None,
+    /// An inline box, whose children join the surrounding line.
     Inline,
+    /// An atomic box laid out inline.
     InlineBlock,
+    /// A flex container.
     Flex,
+    /// A grid container.
     Grid,
+    /// A table.
     Table,
+    /// A table row.
     TableRow,
+    /// A table cell.
     TableCell,
 }
 
@@ -134,8 +148,11 @@ pub enum TextAlign {
     /// Takes the containing block's value. At the top of a tree the value is `Start`.
     #[default]
     Inherit,
+    /// Start edge: left in LTR, right in RTL.
     Start,
+    /// Centred.
     Center,
+    /// End edge: right in LTR, left in RTL.
     End,
     /// Spreads each line to the full width by widening its spaces. The last line of a run stays
     /// at the start edge, as in CSS.
@@ -143,19 +160,26 @@ pub enum TextAlign {
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+/// Inline direction of text, and of flex and grid flow.
 pub enum Direction {
     /// Takes the parent's direction. At the top of a tree the direction is `Ltr`.
     #[default]
     Inherit,
+    /// Left to right.
     Ltr,
+    /// Right to left.
     Rtl,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+/// How a box is positioned.
 pub enum Position {
     #[default]
+    /// In normal flow, not offset.
     Static,
+    /// In normal flow, offset by its insets.
     Relative,
+    /// Taken out of flow and placed by its insets.
     Absolute,
     /// Laid out as `Absolute`, but the containing block is the nearest positioned ancestor rather
     /// than the viewport, since there is no viewport here.
@@ -172,34 +196,50 @@ impl Position {
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+/// Whether `width` and `height` include padding and border.
 pub enum BoxSizing {
     #[default]
+    /// They do not include padding and border.
     ContentBox,
+    /// They include padding and border.
     BorderBox,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+/// What happens to content outside the box.
 pub enum Overflow {
     #[default]
+    /// Not clipped.
     Visible,
+    /// Clipped to the box.
     Hidden,
+    /// Clipped, as `Hidden`. There is no scroll model.
     Scroll,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+/// Whether the box floats, and to which side.
 pub enum Float {
     #[default]
+    /// Not floated.
     None,
+    /// Floats to the left.
     Left,
+    /// Floats to the right.
     Right,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+/// Which floats the box moves below.
 pub enum Clear {
     #[default]
+    /// No clearance.
     None,
+    /// Moves below left floats.
     Left,
+    /// Moves below right floats.
     Right,
+    /// Moves below all floats.
     Both,
 }
 
@@ -207,39 +247,59 @@ pub enum Clear {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Break {
     #[default]
+    /// No forced break.
     Auto,
+    /// Keeps the box whole, if it fits on a page.
     Avoid,
+    /// Always breaks at this point.
     Always,
     /// Break to the next page on the left (odd-numbered pages in the page sequence are right).
     Left,
+    /// Breaks to the next page on the right.
     Right,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+/// Main axis and direction of flex items.
 pub enum FlexDirection {
     #[default]
+    /// Main axis runs left to right.
     Row,
+    /// Main axis runs right to left.
     RowReverse,
+    /// Main axis runs top to bottom.
     Column,
+    /// Main axis runs bottom to top.
     ColumnReverse,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+/// Whether flex items stay on one line or wrap.
 pub enum FlexWrap {
     #[default]
+    /// A single line.
     NoWrap,
+    /// Lines wrap, in the cross direction.
     Wrap,
+    /// Lines wrap, in reverse cross order.
     WrapReverse,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+/// Distribution of items along the main axis.
 pub enum JustifyContent {
     #[default]
+    /// Packed at the start.
     FlexStart,
+    /// Packed at the end.
     FlexEnd,
+    /// Centred.
     Center,
+    /// Free space between items.
     SpaceBetween,
+    /// Half as much space at each end as between items.
     SpaceAround,
+    /// Equal space everywhere, including the ends.
     SpaceEvenly,
 }
 
@@ -247,28 +307,43 @@ pub enum JustifyContent {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum AlignItems {
     #[default]
+    /// Stretched to fill the line.
     Stretch,
+    /// Aligned to the start of the line.
     FlexStart,
+    /// Aligned to the end of the line.
     FlexEnd,
+    /// Centred in the line.
     Center,
+    /// Aligned on the baseline.
     Baseline,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+/// Distribution of lines along the cross axis.
 pub enum AlignContent {
     #[default]
+    /// Lines stretch to fill the container.
     Stretch,
+    /// Lines packed at the start.
     FlexStart,
+    /// Lines packed at the end.
     FlexEnd,
+    /// Lines centred.
     Center,
+    /// Free space between lines.
     SpaceBetween,
+    /// Half as much space at each end as between lines.
     SpaceAround,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+/// Direction in which auto-placed grid items fill the grid.
 pub enum GridAutoFlow {
     #[default]
+    /// Items fill rows first.
     Row,
+    /// Items fill columns first.
     Column,
 }
 
@@ -288,7 +363,12 @@ pub enum TrackSize {
     #[default]
     Auto,
     /// `minmax(min, max)` with px or percentage bounds. `Auto` means content-sized.
-    MinMax { min: Dimension, max: Dimension },
+    MinMax {
+        /// Lower bound.
+        min: Dimension,
+        /// Upper bound.
+        max: Dimension,
+    },
 }
 
 /// Explicit track list, in order. Tracks beyond `len` are implicit (`grid_auto_*`).
@@ -297,8 +377,11 @@ pub enum TrackSize {
 /// unnamed. Lines are named with [`Tracks::with_line_name`].
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Tracks {
+    /// Track sizes. Entries past `len` are unused.
     pub items: [TrackSize; MAX_TRACKS],
+    /// Number of tracks.
     pub len: u8,
+    /// Name of the grid line before each track, or `0` for none. One more entry than tracks.
     pub line_names: [u8; MAX_TRACKS + 1],
 }
 
@@ -346,6 +429,7 @@ impl Tracks {
         self
     }
 
+    /// The tracks in use.
     pub fn as_slice(&self) -> &[TrackSize] {
         &self.items[..self.len as usize]
     }
@@ -355,7 +439,9 @@ impl Tracks {
 /// `BoxStyle`, so that styles stay small.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct GridTemplate {
+    /// Column tracks.
     pub columns: Tracks,
+    /// Row tracks.
     pub rows: Tracks,
     /// Row-major named areas. `0` is an empty cell.
     pub areas: [[u8; MAX_AREA_DIM]; MAX_AREA_DIM],
@@ -372,6 +458,7 @@ pub struct GridTemplate {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum GridLine {
     #[default]
+    /// Chosen by auto-placement.
     Auto,
     /// 1-based line index. Negative values count from the end (`-1` is the last line).
     Index(i32),
@@ -384,14 +471,18 @@ pub enum GridLine {
 /// Placement of a grid item on one axis.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct GridPlacement {
+    /// Where the item starts.
     pub start: GridLine,
+    /// Where the item ends.
     pub end: GridLine,
 }
 
 /// Style for one box. `max_*` set to `Auto` means no maximum.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct BoxStyle {
+    /// How the box takes part in layout.
     pub display: Display,
+    /// Inline direction. Inherited when `Inherit`.
     pub direction: Direction,
     /// Alignment of inline content within each line box.
     pub text_align: TextAlign,
@@ -406,30 +497,47 @@ pub struct BoxStyle {
     /// Width divided by height for a box whose height is `auto`. Applies in block flow only, and
     /// only when the width is known. `None` or a non-positive value means no ratio.
     pub aspect_ratio: Option<f32>,
+    /// Writing mode. Inherited when `Inherit`.
     pub writing_mode: WritingMode,
+    /// Positioning scheme.
     pub position: Position,
+    /// Whether sizes include padding and border.
     pub box_sizing: BoxSizing,
+    /// Width.
     pub width: Dimension,
+    /// Height.
     pub height: Dimension,
+    /// Minimum width.
     pub min_width: Dimension,
+    /// Maximum width.
     pub max_width: Dimension,
+    /// Minimum height.
     pub min_height: Dimension,
+    /// Maximum height.
     pub max_height: Dimension,
     /// `Auto` is only meaningful for horizontal margins.
     pub margin: Edges<Dimension>,
+    /// Padding on each side.
     pub padding: Edges<Dimension>,
+    /// Border width on each side.
     pub border: Edges<Px>,
     /// Offsets for `Relative` and `Absolute` boxes (top, right, bottom, left).
     pub inset: Edges<Dimension>,
+    /// Clipping of content outside the box.
     pub overflow: Overflow,
     /// Paint order within the containing stacking order. See `paint::paint_order`.
     pub z_index: Option<i32>,
+    /// Floating side.
     pub float: Float,
+    /// Floats to clear below.
     pub clear: Clear,
 
     // Pagination and columns.
+    /// Page-break rule before the box.
     pub break_before: Break,
+    /// Page-break rule after the box.
     pub break_after: Break,
+    /// Whether the box may be split across pages.
     pub break_inside: Break,
     /// Minimum lines at the bottom of a page before a break (text leaves).
     pub orphans: u16,
@@ -447,34 +555,53 @@ pub struct BoxStyle {
     pub table_layout: TableLayout,
 
     // Flex container.
+    /// Main axis and direction of a flex container.
     pub flex_direction: FlexDirection,
+    /// Whether flex items wrap.
     pub flex_wrap: FlexWrap,
+    /// Distribution of items along the main axis.
     pub justify_content: JustifyContent,
+    /// Alignment of items across the cross axis.
     pub align_items: AlignItems,
+    /// Distribution of lines across the cross axis.
     pub align_content: AlignContent,
+    /// Gap between rows.
     pub row_gap: Dimension,
+    /// Gap between columns.
     pub column_gap: Dimension,
 
     // Flex item.
     /// `None` means `auto` (the stretch-to-fit default is `align_items`).
     pub align_self: Option<AlignItems>,
+    /// Share of free space taken when growing.
     pub flex_grow: f32,
+    /// Share of overflow taken when shrinking.
     pub flex_shrink: f32,
+    /// Starting size before growing and shrinking.
     pub flex_basis: Dimension,
+    /// Order among siblings. Lower values come first.
     pub order: i32,
 
     // Grid container templates live on the node (see `GridTemplate`) to keep styles small.
+    /// Size of implicit columns.
     pub grid_auto_columns: TrackSize,
+    /// Size of implicit rows.
     pub grid_auto_rows: TrackSize,
+    /// Direction of auto-placement.
     pub grid_auto_flow: GridAutoFlow,
+    /// Whether auto-placement fills gaps left by earlier items.
     pub grid_auto_flow_dense: bool,
+    /// Default justification of items within their cells.
     pub justify_items: AlignItems,
 
     // Grid item.
+    /// Column placement.
     pub grid_column: GridPlacement,
+    /// Row placement.
     pub grid_row: GridPlacement,
     /// Named area id (from the parent grid's template areas). `0` for none.
     pub grid_area: u8,
+    /// Justification of this item. `None` uses `justify_items`.
     pub justify_self: Option<AlignItems>,
 }
 

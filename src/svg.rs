@@ -23,6 +23,7 @@ pub struct SvgCanvas {
 }
 
 impl SvgCanvas {
+    /// An empty canvas.
     pub fn new() -> Self {
         Self::default()
     }

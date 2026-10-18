@@ -9,7 +9,9 @@ use crate::px::Px;
 /// One laid-out line.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LineBox {
+    /// Width of the line's text, not counting the break space.
     pub width: Px,
+    /// Height of the line.
     pub height: Px,
     /// Distance from the top of the line to its baseline.
     pub baseline: Px,
@@ -17,6 +19,7 @@ pub struct LineBox {
     pub text: Range<usize>,
 }
 
+/// Breaks text into lines and measures them. The layout engine calls this; a font-backed implementation goes here.
 pub trait TextMeasurer {
     /// Breaks `text` into lines no wider than `max_width` and reports each line's box.
     /// Must be deterministic: identical inputs produce identical output on every platform.
@@ -27,12 +30,16 @@ pub trait TextMeasurer {
 /// Monospace-style mock: every character advances by `advance`. Breaks at spaces and at `\n`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FixedAdvanceMeasurer {
+    /// Width of every character.
     pub advance: Px,
+    /// Height of every line.
     pub line_height: Px,
+    /// Distance from the top of a line to its baseline.
     pub ascent: Px,
 }
 
 impl FixedAdvanceMeasurer {
+    /// Creates a mock with the given metrics.
     pub fn new(advance: Px, line_height: Px, ascent: Px) -> Self {
         FixedAdvanceMeasurer {
             advance,

@@ -173,6 +173,7 @@ Plan: `C:\Users\phill\.claude\plans\review-platform-for-bugs-optimized-allen.md`
 - [ ] Optional CSS-subset parser behind a `css` feature. **Decision: do not build.** `spec.txt` leaves styling input to the downstream apps; a parser would be a second, partial CSS engine to maintain.
 - [x] Docs: `docs/quickstart.md` (walkthrough of `examples/quickstart.rs`) and `docs/text-measurer.md` (the trait's rules). Linked from README.
 - [x] CSS-differences table: `docs/css-differences.md`, linked from README.
-- [ ] mdbook, cookbook; docs.rs metadata. `#![warn(missing_docs)]` gives 206 warnings today (124 in `style.rs`, mostly enum variants and fields); enable it after a documentation pass
+- [x] `#![warn(missing_docs)]` enabled, with every public item documented (it gave 206 warnings before).
+- [ ] mdbook and cookbook. Not planned as an mdbook for now: the `docs/` pages cover the same ground in plain markdown.
 - [ ] Publish readiness: LICENSE, Cargo.toml metadata, flip `publish`, tag, release workflow, issue template
 - [ ] Example with a real font-backed `TextMeasurer` (dev-dependency). **Decision: do not add.** It needs a font-parsing dependency; `docs/text-measurer.md` shows how to write one.

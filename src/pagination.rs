@@ -39,11 +39,17 @@ use crate::{
 /// Page size and margins, all in px.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PageConstraints {
+    /// Page width.
     pub page_width: Px,
+    /// Page height.
     pub page_height: Px,
+    /// Margin above the content area.
     pub margin_top: Px,
+    /// Margin to the right of the content area.
     pub margin_right: Px,
+    /// Margin below the content area.
     pub margin_bottom: Px,
+    /// Margin to the left of the content area.
     pub margin_left: Px,
     /// Space reserved at the top of the content area for a running header.
     pub header_height: Px,
@@ -101,7 +107,9 @@ impl PageConstraints {
 /// One page of the output. Sizes and offsets are `f32` pixels, the output boundary.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Page {
+    /// Page width.
     pub width: f32,
+    /// Page height.
     pub height: f32,
     /// Where this page starts in the continuous document flow.
     pub content_offset_y: f32,
@@ -112,19 +120,26 @@ pub struct Page {
 /// A piece of a box on one page. `lines` is the range of a text box's lines placed here.
 #[derive(Clone, Debug, PartialEq)]
 pub struct PageFragment {
+    /// The box this fragment belongs to.
     pub node: NodeId,
+    /// Index of the page, counted from 0.
     pub page: usize,
     /// Top of the fragment, relative to the top of the page's content area.
     pub y: f32,
+    /// Height of the fragment on its page.
     pub height: f32,
+    /// For text, the lines placed on this page, as indices into the box's lines.
     pub lines: Option<Range<usize>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
+/// The pages of a paginated layout, and where each box landed.
 pub struct PageLayout {
+    /// The pages, in order.
     pub pages: Vec<Page>,
     /// Height of the continuous flow.
     pub total_height: f32,
+    /// Where each box or line range landed, across all pages.
     pub fragments: Vec<PageFragment>,
 }
 

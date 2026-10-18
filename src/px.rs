@@ -12,7 +12,9 @@ pub const PX_SCALE: i32 = 64;
 pub struct Px(pub i32);
 
 impl Px {
+    /// Zero.
     pub const ZERO: Px = Px(0);
+    /// The largest value.
     pub const MAX: Px = Px(i32::MAX);
 
     /// Whole pixels.
@@ -31,6 +33,7 @@ impl Px {
         self.0 as f32 / PX_SCALE as f32
     }
 
+    /// True for zero.
     pub const fn is_zero(self) -> bool {
         self.0 == 0
     }

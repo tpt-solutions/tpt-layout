@@ -11,6 +11,7 @@
 //! - Halves round away from zero everywhere.
 
 #![no_std]
+#![warn(missing_docs)]
 #![forbid(unsafe_code)]
 
 extern crate alloc;

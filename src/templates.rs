@@ -17,9 +17,13 @@ use crate::{
 
 /// A laid-out template: the tree, its root, and the root's size in px.
 pub struct Template {
+    /// The laid-out tree.
     pub tree: BoxTree,
+    /// The root box.
     pub root: NodeId,
+    /// Width of the root.
     pub width: Px,
+    /// Height of the root.
     pub height: Px,
 }
 

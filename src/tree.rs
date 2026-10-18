@@ -18,6 +18,7 @@ use crate::{
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+/// Handle to a box in a [`BoxTree`]. It stops matching once the box is removed.
 pub struct NodeId {
     slot: u32,
     generation: u32,
@@ -43,17 +44,24 @@ pub(crate) struct Frame {
 /// One run of text placed on a line inside an inline formatting context.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Fragment {
+    /// Left edge, relative to the tree's origin.
     pub x: Px,
+    /// Top edge, relative to the tree's origin.
     pub y: Px,
+    /// Width.
     pub width: Px,
+    /// Height.
     pub height: Px,
     /// Byte range of the source text this fragment covers.
     pub text_range: Range<usize>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
+/// A box in the tree, with its style and computed layout.
 pub struct BoxNode {
+    /// Its handle.
     pub id: NodeId,
+    /// Its style.
     pub style: BoxStyle,
     /// Text content. A node with text is a leaf sized by the [`TextMeasurer`](crate::TextMeasurer).
     pub text: Option<String>,
@@ -79,8 +87,11 @@ pub struct BoxNode {
 /// Errors from tree edits. Layout itself never fails on a well-formed tree.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TreeError {
+    /// No live box has this id.
     NotFound(NodeId),
+    /// The box already has a parent.
     AlreadyHasParent(NodeId),
+    /// The edit would make a box its own ancestor.
     WouldCycle,
     /// Layout descended past `flow::MAX_DEPTH`.
     TooDeep,
@@ -103,6 +114,7 @@ impl fmt::Display for TreeError {
 impl std::error::Error for TreeError {}
 
 #[derive(Clone, Debug, Default, PartialEq)]
+/// An arena of boxes, addressed by [`NodeId`].
 pub struct BoxTree {
     slots: Vec<Option<BoxNode>>,
     /// Generation of each slot. Bumped when a node is removed, so older ids no longer match.
@@ -114,6 +126,7 @@ pub struct BoxTree {
 }
 
 impl BoxTree {
+    /// An empty tree.
     pub fn new() -> Self {
         Self::default()
     }
@@ -123,10 +136,12 @@ impl BoxTree {
         self.slots.iter().filter(|slot| slot.is_some()).count()
     }
 
+    /// True when no box is live.
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
+    /// Adds a box and returns its id.
     pub fn insert(&mut self, style: BoxStyle) -> NodeId {
         self.push(style, None)
     }
@@ -190,6 +205,7 @@ impl BoxTree {
         id
     }
 
+    /// The box with this id, or `None` if it was removed.
     pub fn get(&self, id: NodeId) -> Option<&BoxNode> {
         self.slots
             .get(id.index())?
@@ -212,6 +228,7 @@ impl BoxTree {
             .filter(|node| node.id == id)
     }
 
+    /// The parent of `id`, if it has one.
     pub fn parent(&self, id: NodeId) -> Option<NodeId> {
         self.get(id)?.parent
     }

@@ -42,6 +42,7 @@ Complete implementation of the layout engine. Not published: see TODO.md.
 - Grid templates (`grid_template_columns`, `grid_template_rows`, `grid_template_areas`) moved from
   `BoxStyle` to the node, set with `BoxTree::set_grid_template` (`GridTemplate`). `BoxStyle` is now
   about 300 bytes instead of 1 KB.
+- Every public item is documented, and `missing_docs` is enabled.
 - `LineBox` has a `text` byte range, so renderers can draw each line's characters. `LineBox` is no
   longer `Copy`.
 - `Direction` and `TextAlign` have an `Inherit` default and are inherited from the containing block.
