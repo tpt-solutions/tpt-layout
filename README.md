@@ -62,6 +62,11 @@ result always equals a full pass.
   `scripts/check.sh` and CI run the same tests on each platform. The pagination hash test and the
   golden layout files pin the output.
 
+## License
+
+Licensed under either of [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your option.
+Copyright (c) 2026 TPT Solutions.
+
 ## Status
 
 Phases 0 to 5 are implemented with tests. Version 1.0.0 is set locally and not published. Known

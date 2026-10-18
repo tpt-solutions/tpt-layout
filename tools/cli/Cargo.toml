@@ -2,6 +2,8 @@
 name = "tpt-layout-cli"
 version = "0.1.0"
 edition = "2021"
+license = "MIT OR Apache-2.0"
+authors = ["TPT Solutions"]
 description = "Command-line tool: lay out a JSON box tree, and write SVG or layout JSON"
 publish = false
 

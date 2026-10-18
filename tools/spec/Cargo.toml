@@ -2,6 +2,8 @@
 name = "tpt-layout-spec"
 version = "0.1.0"
 edition = "2021"
+license = "MIT OR Apache-2.0"
+authors = ["TPT Solutions"]
 description = "JSON description of a tpt-layout box tree, with SVG and layout output"
 publish = false
 

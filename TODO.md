@@ -98,7 +98,10 @@ Status: `[x]` is done and tested. `[ ]` is not done. Notes after an item say wha
 
 ## Open items to confirm later
 - [x] Final Rust API shape for tables and RTL (not in spec). Decided: keep the current names. Tables use `Display::Table`, `TableRow` and `TableCell`; RTL is `BoxStyle::direction`. Recorded in CHANGELOG.md.
-- [ ] Real tpt-text / tpt-canvas / tpt-math integration once those crates exist
+- [ ] Real tpt-text / tpt-canvas / tpt-math integration. **Decision, per the spec:** tpt-text is needed for real documents, and tpt-canvas is optional. tpt-math is not needed.
+  - tpt-text (shaping, line breaking, glyph metrics) is what makes line breaks match a real font. Layout reads it only through `TextMeasurer`, so the integration is an adapter that implements that trait. It is blocked until the crate exists; it is not in this repository.
+  - tpt-canvas is only a drawing API. Layout never draws, and `svg::SvgCanvas` already implements the `Canvas` trait, so there is no need for it yet.
+  - tpt-math would only do constraint solving. The layout uses fixed-point arithmetic and has no constraints to solve, so there is nothing to integrate.
 
 ## Phase 6: Review follow-ups (from the 2026-10 platform review)
 Plan: `C:\Users\phill\.claude\plans\review-platform-for-bugs-optimized-allen.md`
