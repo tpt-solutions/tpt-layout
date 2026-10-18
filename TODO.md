@@ -168,6 +168,7 @@ Plan: `C:\Users\phill\.claude\plans\review-platform-for-bugs-optimized-allen.md`
 - [ ] `BoxStyle` builder and fluent tree builder
 - [ ] Optional CSS-subset parser behind a `css` feature
 - [x] Docs: `docs/quickstart.md` (walkthrough of `examples/quickstart.rs`) and `docs/text-measurer.md` (the trait's rules). Linked from README.
-- [ ] mdbook, cookbook, CSS-differences table; docs.rs metadata. `#![warn(missing_docs)]` gives 206 warnings today (124 in `style.rs`, mostly enum variants and fields); enable it after a documentation pass
+- [x] CSS-differences table: `docs/css-differences.md`, linked from README.
+- [ ] mdbook, cookbook; docs.rs metadata. `#![warn(missing_docs)]` gives 206 warnings today (124 in `style.rs`, mostly enum variants and fields); enable it after a documentation pass
 - [ ] Publish readiness: LICENSE, Cargo.toml metadata, flip `publish`, tag, release workflow, issue template
 - [ ] Example with a real font-backed `TextMeasurer` (dev-dependency)
