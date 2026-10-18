@@ -57,4 +57,4 @@ pub use style::{
     WritingMode,
 };
 pub use text::{FixedAdvanceMeasurer, LineBox, TextMeasurer};
-pub use tree::{BoxNode, BoxTree, Fragment, NodeId, TreeError};
+pub use tree::{BoxNode, BoxTree, Fragment, NodeId, TreeError, TreeScope};

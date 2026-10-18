@@ -148,7 +148,7 @@ Plan: `C:\Users\phill\.claude\plans\review-platform-for-bugs-optimized-allen.md`
 - [x] Test: `relayout` with changed constraints
 - [x] Test: `remove` then `relayout` matches a full layout
 - [x] Tests added since: inline-paragraph pagination (`tests/paragraph_split.rs`), RTL inside a vertical box and triple writing-mode nesting (`tests/writing_nesting.rs`), tables across pages (`tests/templates_invoice.rs`).
-- [ ] Tests still missing: percentages in nested writing-mode roots
+- [x] Tests for percentages in nested writing-mode roots (`tests/writing_percentages.rs`). They pin the limit as it stands: a root under a horizontal box resolves percentages against it, but a nested root under a vertical box does not. Making nested roots resolve them would need the containing block mapped into the root's logical space.
 - [x] Property tests: layout idempotence, and pagination gives each text box contiguous, disjoint line ranges from 0 (`tests/properties.rs`, seeded generator)
 - [x] Unit tests in `src/`: grid track spacing, aspect-ratio and length helpers, flex justify and gap, and `is_boundary` in the engine. Still missing for table and the rest of flex
 - [x] MSRV: `rust-version = "1.74"` in Cargo.toml. Verified locally by running the full test suite on 1.74; the `msrv` CI job does the same (it deletes the tracked Cargo.lock, which newer cargo writes in a format 1.74 cannot read)
@@ -175,7 +175,7 @@ Plan: `C:\Users\phill\.claude\plans\review-platform-for-bugs-optimized-allen.md`
 - [x] Report template with orphan and widow control, paginated with `Template::paginate` (`templates::report`; `examples/report.rs`; `tests/templates_report.rs`).
 - [x] Invoice header repeats across pages. The paginator read `table_header` only from cells, but the template sets it on the row, so no header ever repeated. It now honours the row or the cell. Tests: `tests/templates_invoice.rs`.
 - [x] `direction` and `text-align` are inherited, as in CSS. Both have an `Inherit` default, resolved by walking up the tree (`BoxTree::effective_direction` / `effective_text_align`). Tests: `tests/inheritance.rs`. `line-height` and `white-space` are not inherited, and neither is `text-indent`.
-- [ ] `BoxStyle` builder and fluent tree builder
+- [x] `BoxStyle` builder and fluent tree builder: every plain `BoxStyle` field has a chainable setter (`BoxStyle::default().width(...)`), and `BoxTree::build` with a `TreeScope` adds children in a closure. Grid templates are still set with `BoxTree::set_grid_template`. Tests: `tests/builder.rs`
 - [ ] Optional CSS-subset parser behind a `css` feature. **Decision: do not build.** `spec.txt` leaves styling input to the downstream apps; a parser would be a second, partial CSS engine to maintain.
 - [x] Docs: `docs/quickstart.md` (walkthrough of `examples/quickstart.rs`) and `docs/text-measurer.md` (the trait's rules). Linked from README.
 - [x] CSS-differences table: `docs/css-differences.md`, linked from README.

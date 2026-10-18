@@ -525,3 +525,82 @@ impl BoxTree {
         }
     }
 }
+
+/// Adds children to a box while a closure builds its subtree. See [`BoxTree::build`].
+///
+/// Children are appended in the order they are added.
+pub struct TreeScope<'a> {
+    tree: &'a mut BoxTree,
+    parent: NodeId,
+}
+
+impl TreeScope<'_> {
+    /// The box that children are added to.
+    pub fn parent(&self) -> NodeId {
+        self.parent
+    }
+
+    /// Adds a box with a child subtree built by `build`, and returns its id.
+    pub fn element(&mut self, style: BoxStyle, build: impl FnOnce(&mut TreeScope<'_>)) -> NodeId {
+        let id = self.tree.insert(style);
+        self.attach(id);
+        self.tree.build_into(id, build);
+        id
+    }
+
+    /// Adds a text leaf and returns its id.
+    pub fn text(&mut self, style: BoxStyle, text: impl Into<String>) -> NodeId {
+        let id = self.tree.insert_text(style, text);
+        self.attach(id);
+        id
+    }
+
+    /// Adds a replaced element with an intrinsic size and returns its id.
+    pub fn replaced(&mut self, style: BoxStyle, width: Px, height: Px) -> NodeId {
+        let id = self.tree.insert_replaced(style, width, height);
+        self.attach(id);
+        id
+    }
+
+    /// Adds a box that has no children and returns its id.
+    pub fn leaf(&mut self, style: BoxStyle) -> NodeId {
+        self.element(style, |_| {})
+    }
+
+    /// The tree being built, for edits that the builder does not cover.
+    pub fn tree(&mut self) -> &mut BoxTree {
+        self.tree
+    }
+
+    fn attach(&mut self, child: NodeId) {
+        self.tree
+            .append_child(self.parent, child)
+            .expect("the parent was just inserted and is live");
+    }
+}
+
+impl BoxTree {
+    /// Builds a box and its subtree in one expression. `build` receives a [`TreeScope`] whose
+    /// children are appended to the new box. Returns the new box's id.
+    ///
+    /// ```
+    /// use tpt_layout::{BoxStyle, BoxTree, Dimension, Px};
+    ///
+    /// let mut tree = BoxTree::new();
+    /// let root = tree.build(BoxStyle::default().width(Dimension::px(200)), |scope| {
+    ///     scope.text(BoxStyle::default(), "Hello");
+    ///     scope.leaf(BoxStyle::default().height(Dimension::Length(Px::from_px(20))));
+    /// });
+    /// assert_eq!(tree.children(root).len(), 2);
+    /// ```
+    pub fn build(&mut self, style: BoxStyle, build: impl FnOnce(&mut TreeScope<'_>)) -> NodeId {
+        let id = self.insert(style);
+        self.build_into(id, build);
+        id
+    }
+
+    fn build_into(&mut self, parent: NodeId, build: impl FnOnce(&mut TreeScope<'_>)) {
+        let mut scope = TreeScope { tree: self, parent };
+        build(&mut scope);
+    }
+}

@@ -26,6 +26,8 @@ Complete implementation of the layout engine. Not published: see TODO.md.
   A box whose mode differs from its parent's (for example a horizontal box inside a vertical one)
   is laid out in its own mode and mapped back. `WritingMode::Inherit` is the default.
 - Named grid lines (`GridLine::Named`, `Tracks::with_line_name`).
+- Chainable `BoxStyle` setters (one per field) and `BoxTree::build` with `TreeScope` for building
+  a subtree in a closure.
 - `TreeError::TooDeep` and `flow::MAX_DEPTH` (128): deeper trees are rejected instead of
   overflowing the stack.
 - Adapted official-suite tests (`tests/wpt_*.rs`), each naming its web-platform-tests source.

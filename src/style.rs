@@ -666,3 +666,81 @@ impl Default for BoxStyle {
         }
     }
 }
+
+/// Generates a chainable setter for each listed field. Each takes the value by value and returns
+/// the style, so a style can be written as one expression.
+macro_rules! builder_setters {
+    ($($field:ident: $ty:ty),* $(,)?) => {
+        $(
+            #[doc = concat!("Sets `", stringify!($field), "` and returns the style.")]
+            #[must_use]
+            pub fn $field(mut self, value: $ty) -> Self {
+                self.$field = value;
+                self
+            }
+        )*
+    };
+}
+
+/// Chainable setters, so a style can be written as one expression, for example
+/// `BoxStyle::default().width(Dimension::px(200)).padding(...)`. Each sets one field and leaves the
+/// rest as they were.
+impl BoxStyle {
+    builder_setters! {
+        display: Display,
+        direction: Direction,
+        text_align: TextAlign,
+        text_indent: Dimension,
+        line_height: Dimension,
+        white_space: WhiteSpace,
+        aspect_ratio: Option<f32>,
+        writing_mode: WritingMode,
+        position: Position,
+        box_sizing: BoxSizing,
+        width: Dimension,
+        height: Dimension,
+        min_width: Dimension,
+        max_width: Dimension,
+        min_height: Dimension,
+        max_height: Dimension,
+        margin: Edges<Dimension>,
+        padding: Edges<Dimension>,
+        border: Edges<Px>,
+        inset: Edges<Dimension>,
+        overflow: Overflow,
+        z_index: Option<i32>,
+        float: Float,
+        clear: Clear,
+        break_before: Break,
+        break_after: Break,
+        break_inside: Break,
+        orphans: u16,
+        widows: u16,
+        column_count: u16,
+        table_header: bool,
+        column_span: u16,
+        row_span: u16,
+        table_layout: TableLayout,
+        flex_direction: FlexDirection,
+        flex_wrap: FlexWrap,
+        justify_content: JustifyContent,
+        align_items: AlignItems,
+        align_content: AlignContent,
+        row_gap: Dimension,
+        column_gap: Dimension,
+        align_self: Option<AlignItems>,
+        flex_grow: f32,
+        flex_shrink: f32,
+        flex_basis: Dimension,
+        order: i32,
+        grid_auto_columns: TrackSize,
+        grid_auto_rows: TrackSize,
+        grid_auto_flow: GridAutoFlow,
+        grid_auto_flow_dense: bool,
+        justify_items: AlignItems,
+        grid_column: GridPlacement,
+        grid_row: GridPlacement,
+        grid_area: u8,
+        justify_self: Option<AlignItems>,
+    }
+}
