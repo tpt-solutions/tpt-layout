@@ -86,6 +86,7 @@ To regenerate the golden layouts after an intended change: `UPDATE_GOLDEN=1 carg
 - [docs/quickstart.md](docs/quickstart.md): build, lay out and paginate a tree.
 - [docs/text-measurer.md](docs/text-measurer.md): writing a `TextMeasurer` for real fonts.
 - [docs/css-differences.md](docs/css-differences.md): where the layout differs from CSS.
+- [docs/spec-deviations.md](docs/spec-deviations.md): where the code differs from `spec.txt`.
 
 ## Examples
 

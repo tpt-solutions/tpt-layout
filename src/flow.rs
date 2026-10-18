@@ -341,9 +341,8 @@ fn collapses_top_with_first_child(pass: &Pass, tree: &BoxTree, id: NodeId, cb_wi
     if sides.top_separated() {
         return false;
     }
-    let content_width = inline_size(style, &sides, cb_width).0;
-    first_in_flow_block_child(tree, id)
-        .is_some_and(|child| !is_empty_block(pass, tree, child, content_width))
+    // An empty first child still collapses: its margins pass through it (see `is_empty_block`).
+    first_in_flow_block_child(tree, id).is_some()
 }
 
 /// Whether the bottom margin of a box collapses with its last in-flow child's bottom margin.
@@ -522,10 +521,11 @@ pub(crate) fn layout_in_flow_horizontal(
     let extra_v = sides.vertical_extra();
 
     if is_empty_block(pass, tree, id, cb.width) {
-        cursor.pending = cursor
-            .pending
-            .collapse(Margin::single(sides.margin.top))
-            .collapse(Margin::single(sides.margin.bottom));
+        // The top margin is already in the parent's chain when `inherit_top` is set.
+        if !inherit_top {
+            cursor.pending = cursor.pending.collapse(Margin::single(sides.margin.top));
+        }
+        cursor.pending = cursor.pending.collapse(Margin::single(sides.margin.bottom));
         let (content_width, margin_left, _) = inline_size(&style, &sides, cb.width);
         tree.set_frame(
             id,

@@ -124,7 +124,7 @@ Plan: `C:\Users\phill\.claude\plans\review-platform-for-bugs-optimized-allen.md`
 - [x] `white-space: pre` (`WhiteSpace::Pre`): no wrapping, runs of spaces kept, and each newline starts a new line. Blank lines (two newlines in a row) are dropped and tabs are not expanded. Tests: `tests/white_space_pre.rs`
 - [x] `white-space: pre-wrap` (`WhiteSpace::PreWrap`): as `pre`, but lines wrap at spaces. Tests: `tests/white_space_pre.rs`
 - [x] Inline padding, border and margin on spans and links: their horizontal space is added as gaps around the children, and the element's frame covers it. Vertical padding does not change the line box, as in CSS. Tests: `tests/inline_padding.rs`
-- [ ] Parent top-margin collapse with an empty first child (`flow.rs`)
+- [x] Parent top-margin collapse with an empty first child (`flow.rs`). The margins collapse to the larger value, and the empty child's top margin is not added twice. Tests: `tests/margin_empty_child.rs`
 - [x] Flex `min-width: auto` as min-content. Approximate: widest word for text, sum for flex rows, max otherwise, capped by a fixed width. Only for row main axes; column items keep a zero minimum. Tests: `tests/flex_min_width.rs`
 - [x] Table `colspan` (`BoxStyle::column_span`): a spanning cell widens its columns evenly when they are too narrow, and is laid out across them. Tests: `tests/table_colspan.rs`
 - [x] `table-layout: fixed` (`BoxStyle::table_layout`): the first row's declared cell widths set their columns, and undeclared columns share the rest equally. Tests: `tests/table_fixed.rs`
@@ -136,8 +136,8 @@ Plan: `C:\Users\phill\.claude\plans\review-platform-for-bugs-optimized-allen.md`
 - [x] `position: fixed` is laid out as absolute. Deviation: the containing block is the nearest positioned ancestor, not the viewport, since there is no viewport.
 - [x] `position: sticky` offsets like relative and never sticks, since there is no scroll model.
 - [x] Header/footer placement: `PageLayout::place_running` adds the same header and footer nodes to every page, in the space reserved by `header_height`/`footer_height`. Per-page content such as page numbers is not supported. Tests: `tests/running_content.rs`
-- [ ] Richer `TextMeasurer` input (font, size, language, direction). Do this before publishing
-- [ ] API-deviations note vs `spec.txt` (`&mut BoxTree`/`NodeId`/`Px` instead of `&mut BoxNode`/`f32`)
+- [ ] Richer `TextMeasurer` input (font, size, language, direction). **Decision: defer until `tpt-text` exists.** Its real API decides what the engine needs, and guessing now would mean changing the trait again.
+- [x] API-deviations note vs `spec.txt`: `docs/spec-deviations.md`
 
 ### 6C. Tests and CI
 - [x] Test: `relayout` with changed constraints
@@ -146,7 +146,11 @@ Plan: `C:\Users\phill\.claude\plans\review-platform-for-bugs-optimized-allen.md`
 - [x] Property tests: layout idempotence, and pagination gives each text box contiguous, disjoint line ranges from 0 (`tests/properties.rs`, seeded generator)
 - [x] Unit tests in `src/`: grid track spacing, aspect-ratio and length helpers, flex justify and gap, and `is_boundary` in the engine. Still missing for table and the rest of flex
 - [x] MSRV: `rust-version = "1.74"` in Cargo.toml. Verified locally by running the full test suite on 1.74; the `msrv` CI job does the same (it deletes the tracked Cargo.lock, which newer cargo writes in a format 1.74 cannot read)
-- [ ] CI: `rust-toolchain.toml`, cargo cache, cross-OS determinism hash comparison, run wasm tests, optional `cargo-fuzz`
+- [x] Cross-OS determinism: the pagination hash and golden JSON are pinned constants, and the test matrix runs them on Linux, macOS and Windows, so every OS is compared to the same values.
+- [x] Cargo cache in the main CI job (`Swatinem/rust-cache`). Not yet run on GitHub.
+- [ ] `rust-toolchain.toml`: **Decision: do not add.** CI uses `stable` and the MSRV job pins 1.74, so a file would only pin local development. Add it if the team wants one toolchain everywhere.
+- [ ] Run wasm tests: **Decision: not now.** The wasm build is checked; running tests needs a wasm runner, which is a new tool to maintain.
+- [ ] `cargo-fuzz`: optional. The seeded robustness tests cover the same ground for now.
 - [ ] Push and confirm CI is green on GitHub (never run yet)
 
 ### 6D. Differentiators
@@ -159,16 +163,16 @@ Plan: `C:\Users\phill\.claude\plans\review-platform-for-bugs-optimized-allen.md`
 ### 6E. Adoption
 - [x] SVG debug renderer: `svg::SvgCanvas` implements `Canvas`, and `svg::render_svg` draws it. Text is drawn with its characters, inline and block-level. Block-level lines are also outlined. Vertical text is drawn one character per cell. `LineBox` now carries its byte range (a breaking change, noted in CHANGELOG). Example: `examples/svg_render.rs`
 - [ ] CLI `tpt-layout` (separate workspace crate): JSON tree in, layout JSON or SVG out. **Decision: a separate crate, so the core stays dependency-free.** Not started; it needs a JSON parser and so depends on the serde decision above.
-- [ ] wasm-bindgen playground (static page, GitHub Pages)
+- [ ] wasm-bindgen playground (static page, GitHub Pages). **Decision: separate crate, later.** It needs wasm-bindgen, which the core must not depend on.
 - [x] Starter templates, golden-tested as SVG (`src/templates.rs`, `tests/templates.rs`, `examples/templates.rs`): invoice (table with a header row), dashboard (grid), navbar (flex), resume (two columns). Their text is inline, so the SVG shows the words.
 - [x] Also added: RTL page, vertical page, and a two-column newsletter (`tests/golden/templates/`). Vertical text stacks one character per cell in the SVG, which is exact only for the fixed-advance measurer.
 - [x] Report template with orphan and widow control, paginated with `Template::paginate` (`templates::report`; `examples/report.rs`; `tests/templates_report.rs`).
 - [x] Invoice header repeats across pages. The paginator read `table_header` only from cells, but the template sets it on the row, so no header ever repeated. It now honours the row or the cell. Tests: `tests/templates_invoice.rs`.
 - [x] `direction` and `text-align` are inherited, as in CSS. Both have an `Inherit` default, resolved by walking up the tree (`BoxTree::effective_direction` / `effective_text_align`). Tests: `tests/inheritance.rs`. `line-height` and `white-space` are not inherited, and neither is `text-indent`.
 - [ ] `BoxStyle` builder and fluent tree builder
-- [ ] Optional CSS-subset parser behind a `css` feature
+- [ ] Optional CSS-subset parser behind a `css` feature. **Decision: do not build.** `spec.txt` leaves styling input to the downstream apps; a parser would be a second, partial CSS engine to maintain.
 - [x] Docs: `docs/quickstart.md` (walkthrough of `examples/quickstart.rs`) and `docs/text-measurer.md` (the trait's rules). Linked from README.
 - [x] CSS-differences table: `docs/css-differences.md`, linked from README.
 - [ ] mdbook, cookbook; docs.rs metadata. `#![warn(missing_docs)]` gives 206 warnings today (124 in `style.rs`, mostly enum variants and fields); enable it after a documentation pass
 - [ ] Publish readiness: LICENSE, Cargo.toml metadata, flip `publish`, tag, release workflow, issue template
-- [ ] Example with a real font-backed `TextMeasurer` (dev-dependency)
+- [ ] Example with a real font-backed `TextMeasurer` (dev-dependency). **Decision: do not add.** It needs a font-parsing dependency; `docs/text-measurer.md` shows how to write one.
