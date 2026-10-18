@@ -347,3 +347,62 @@ fn fit_columns(column_max: &[Px], available: Px) -> Vec<Px> {
         .map(|w| w.mul_ratio(available.0 as i64, total.0 as i64))
         .collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{fit_columns, is_occupied, mark};
+    use crate::px::Px;
+    use alloc::vec::Vec;
+
+    fn px(v: i32) -> Px {
+        Px::from_px(v)
+    }
+
+    #[test]
+    fn marking_a_span_occupies_its_columns_in_every_row_it_covers() {
+        let mut occupied: Vec<Vec<bool>> = Vec::new();
+        mark(&mut occupied, 0, 1, 2, 2);
+        assert!(!is_occupied(&occupied, 0, 0));
+        assert!(is_occupied(&occupied, 0, 1));
+        assert!(is_occupied(&occupied, 0, 2));
+        assert!(!is_occupied(&occupied, 0, 3));
+        assert!(is_occupied(&occupied, 1, 2), "second row of the span");
+        assert!(!is_occupied(&occupied, 2, 2), "below the span");
+    }
+
+    #[test]
+    fn unmarked_slots_are_free() {
+        let occupied: Vec<Vec<bool>> = Vec::new();
+        assert!(!is_occupied(&occupied, 5, 5));
+    }
+
+    #[test]
+    fn columns_that_fit_scale_up_in_proportion() {
+        // 40 + 60 = 100 over 200 px: each column doubles.
+        assert_eq!(
+            fit_columns(&[px(40), px(60)], px(200)),
+            alloc::vec![px(80), px(120)]
+        );
+    }
+
+    #[test]
+    fn columns_that_do_not_fit_shrink_in_proportion() {
+        assert_eq!(
+            fit_columns(&[px(100), px(100)], px(100)),
+            alloc::vec![px(50), px(50)]
+        );
+    }
+
+    #[test]
+    fn no_content_shares_the_width_equally() {
+        assert_eq!(
+            fit_columns(&[Px::ZERO, Px::ZERO], px(100)),
+            alloc::vec![px(50), px(50)]
+        );
+    }
+
+    #[test]
+    fn no_columns_gives_no_widths() {
+        assert!(fit_columns(&[], px(100)).is_empty());
+    }
+}

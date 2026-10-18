@@ -309,7 +309,8 @@ fn collect_table(tree: &BoxTree, table: NodeId, out: &mut Vec<Atom>) {
         };
         let mut top: Option<Px> = None;
         let mut bottom = Px::ZERO;
-        let mut header = false;
+        // The row is a header when its row is marked, or when one of its cells is.
+        let mut header = tree.get(row).is_some_and(|n| n.style.table_header);
         for cell in &cells {
             if let (Some(frame), Some(node)) = (tree.frame(*cell), tree.get(*cell)) {
                 top = Some(top.map_or(frame.y, |t| t.min(frame.y)));

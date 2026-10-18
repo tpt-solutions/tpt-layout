@@ -45,6 +45,8 @@ Complete implementation of the layout engine. Not published: see TODO.md.
 - `LineBox` has a `text` byte range, so renderers can draw each line's characters. `LineBox` is no
   longer `Copy`.
 - `Direction` and `TextAlign` have an `Inherit` default and are inherited from the containing block.
+- Pagination: a header row (`table_header` on the row) now repeats on continuation pages. Before, only
+  a flagged cell counted.
 - Pagination: blocks whose children are all inline split between their lines, with orphan and widow
   control, like text leaves.
 - Grid: `Tracks::repeat`, `GridTemplate::auto_fill_columns` and `auto_fit` for fixed-pixel columns.

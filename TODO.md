@@ -163,7 +163,7 @@ Plan: `C:\Users\phill\.claude\plans\review-platform-for-bugs-optimized-allen.md`
 - [x] Starter templates, golden-tested as SVG (`src/templates.rs`, `tests/templates.rs`, `examples/templates.rs`): invoice (table with a header row), dashboard (grid), navbar (flex), resume (two columns). Their text is inline, so the SVG shows the words.
 - [x] Also added: RTL page, vertical page, and a two-column newsletter (`tests/golden/templates/`). Vertical text stacks one character per cell in the SVG, which is exact only for the fixed-advance measurer.
 - [x] Report template with orphan and widow control, paginated with `Template::paginate` (`templates::report`; `examples/report.rs`; `tests/templates_report.rs`).
-- [ ] Invoice does not repeat its header across pages yet (a paginated invoice would need the table headers to repeat, which pagination already does for tables).
+- [x] Invoice header repeats across pages. The paginator read `table_header` only from cells, but the template sets it on the row, so no header ever repeated. It now honours the row or the cell. Tests: `tests/templates_invoice.rs`.
 - [x] `direction` and `text-align` are inherited, as in CSS. Both have an `Inherit` default, resolved by walking up the tree (`BoxTree::effective_direction` / `effective_text_align`). Tests: `tests/inheritance.rs`. `line-height` and `white-space` are not inherited, and neither is `text-indent`.
 - [ ] `BoxStyle` builder and fluent tree builder
 - [ ] Optional CSS-subset parser behind a `css` feature
