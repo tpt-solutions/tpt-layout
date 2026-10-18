@@ -32,7 +32,8 @@ use crate::{
     position::{layout_deferred, Deferred},
     px::Px,
     sizing::{
-        block_size, clamp_block, clamp_inline, inline_size, is_zero_or_auto, to_content, Sides,
+        aspect_height, block_size, clamp_block, clamp_inline, inline_size, is_zero_or_auto,
+        to_content, Sides,
     },
     style::{BoxStyle, Clear, Dimension, Display, Float, Overflow, Position},
     table,
@@ -271,7 +272,7 @@ pub fn layout_flow(
 fn establishes_bfc(pass: &Pass, style: &BoxStyle, id: NodeId) -> bool {
     id == pass.root
         || style.overflow != Overflow::Visible
-        || style.position == Position::Absolute
+        || style.position.is_out_of_flow()
         || matches!(
             style.display,
             Display::Flex
@@ -285,7 +286,7 @@ fn establishes_bfc(pass: &Pass, style: &BoxStyle, id: NodeId) -> bool {
 /// Children that take part in block flow at the top level: not absolutely positioned, not
 /// floated, not inline-level.
 fn is_block_flow_child(child: &BoxStyle) -> bool {
-    child.position != Position::Absolute
+    !child.position.is_out_of_flow()
         && child.float == Float::None
         && !child.display.is_inline_level()
 }
@@ -293,9 +294,9 @@ fn is_block_flow_child(child: &BoxStyle) -> bool {
 /// The first child that is not absolutely positioned or floated, if it is block-level. Margin
 /// collapsing only looks through this child.
 fn first_in_flow_block_child(tree: &BoxTree, id: NodeId) -> Option<NodeId> {
-    let first = tree.children(id).iter().copied().find(|child| {
+    let first = tree.laid_children(id).iter().copied().find(|child| {
         tree.get(*child)
-            .is_some_and(|n| n.style.position != Position::Absolute && n.style.float == Float::None)
+            .is_some_and(|n| !n.style.position.is_out_of_flow() && n.style.float == Float::None)
     })?;
     let node = tree.get(first)?;
     is_block_flow_child(&node.style).then_some(first)
@@ -318,9 +319,13 @@ fn is_empty_block(pass: &Pass, tree: &BoxTree, id: NodeId, cb_width: Px) -> bool
     if !is_zero_or_auto(style.height) || !is_zero_or_auto(style.min_height) {
         return false;
     }
+    // A height implied by `aspect-ratio` is not zero.
+    if style.aspect_ratio.is_some_and(|r| r.is_finite() && r > 0.0) {
+        return false;
+    }
     // Absolutely positioned children do not count as content, but they must still be laid out.
     // The empty-box shortcut skips children entirely, so a box with any child is not empty.
-    tree.children(id).is_empty()
+    tree.laid_children(id).is_empty()
 }
 
 /// Whether the top margin of `id` collapses with the top margin of its first block child.
@@ -369,7 +374,8 @@ fn outer_top_chain(pass: &Pass, tree: &BoxTree, id: NodeId, cb_width: Px) -> Mar
 }
 
 pub(crate) fn relative_offset(style: &BoxStyle, cb: Containing) -> (Px, Px) {
-    if style.position != Position::Relative {
+    // Sticky has no scroll model here, so it offsets like relative.
+    if !matches!(style.position, Position::Relative | Position::Sticky) {
         return (Px::ZERO, Px::ZERO);
     }
     let dx = match (
@@ -543,7 +549,8 @@ pub(crate) fn layout_in_flow_horizontal(
     let (content_width, margin_left, _) = inline_size(&style, &sides, cb.width);
     let y_border = cursor.y;
     let x_border = cb.x + margin_left;
-    let explicit_height = block_size(&style, cb.height, extra_v);
+    let explicit_height =
+        block_size(&style, cb.height, extra_v).or_else(|| aspect_height(&style, content_width));
     let inherit_first = collapses_top_with_first_child(pass, tree, id, cb.width);
     let content = Containing {
         x: x_border + sides.border.left + sides.padding.left,
@@ -782,7 +789,7 @@ pub(crate) fn layout_block_children(
     inherit_first: bool,
     deferred: &mut Vec<Deferred>,
 ) -> (Px, Margin, Option<Px>) {
-    let children = tree.children(id).to_vec();
+    let children = tree.laid_children(id).to_vec();
     let mut cursor = Cursor::new(top);
     let mut floats = Floats::default();
     let mut baseline = None;
@@ -794,7 +801,7 @@ pub(crate) fn layout_block_children(
             index += 1;
             continue;
         };
-        if style.position == Position::Absolute {
+        if style.position.is_out_of_flow() {
             deferred.push(Deferred {
                 id: child,
                 static_x: content.x,
@@ -820,7 +827,7 @@ pub(crate) fn layout_block_children(
                 && tree.get(children[index]).is_some_and(|n| {
                     n.style.display.is_inline_level()
                         && n.style.float == Float::None
-                        && n.style.position != Position::Absolute
+                        && !n.style.position.is_out_of_flow()
                 })
             {
                 index += 1;

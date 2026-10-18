@@ -1,4 +1,4 @@
-//! Flexbox layout (TODO Phase 2).
+//! Flexbox layout.
 //!
 //! Algorithm, in the order the spec prescribes (no step iterates to convergence):
 //! 1. Collect in-flow items and sort them by `order` (stable).
@@ -27,7 +27,7 @@ use crate::{
     sizing::{clamp_inline, to_content, Sides},
     style::{
         AlignContent, AlignItems, Dimension, Direction, FlexDirection, FlexWrap, JustifyContent,
-        Position,
+        Overflow,
     },
     tree::{BoxTree, NodeId},
 };
@@ -72,6 +72,7 @@ pub(crate) fn layout_flex(
         return (top, Margin::ZERO, None);
     };
     let style = node.style;
+    let direction = tree.effective_direction(id);
     let row = matches!(
         style.flex_direction,
         FlexDirection::Row | FlexDirection::RowReverse
@@ -82,7 +83,7 @@ pub(crate) fn layout_flex(
     );
     // In a right-to-left row, the main axis starts on the right.
     let main_reverse = if row {
-        reverse != (style.direction == Direction::Rtl)
+        reverse != (direction == Direction::Rtl)
     } else {
         reverse
     };
@@ -108,11 +109,11 @@ pub(crate) fn layout_flex(
     };
 
     let mut entries: Vec<(i32, NodeId)> = Vec::new();
-    for child in tree.children(id).to_vec() {
+    for child in tree.laid_children(id).to_vec() {
         let Some(child_node) = tree.get(child) else {
             continue;
         };
-        if child_node.style.position == Position::Absolute {
+        if child_node.style.position.is_out_of_flow() {
             deferred.push(Deferred {
                 id: child,
                 static_x: content.x,
@@ -360,11 +361,18 @@ fn make_item(
     };
 
     let (min, max) = if row {
+        // `min-width: auto` on a visible-overflow item is its min-content width, not zero.
+        let auto_min = if style.min_width == Dimension::Auto && style.overflow == Overflow::Visible
+        {
+            intrinsic::min_content(pass, tree, id)
+        } else {
+            Px::ZERO
+        };
         (
             style
                 .min_width
                 .resolve(Some(content.width))
-                .map_or(Px::ZERO, |v| to_content(&style, v, main_extra)),
+                .map_or(auto_min, |v| to_content(&style, v, main_extra)),
             style
                 .max_width
                 .resolve(Some(content.width))
@@ -821,4 +829,95 @@ fn main_total(items: &[Item], line: &[usize], gap: Px) -> Px {
             + main_margin_fixed(item, false, true)
             + main_margin_fixed(item, false, false)
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{justify_offsets, resolve_gap};
+    use crate::{
+        px::Px,
+        style::{Dimension, JustifyContent},
+    };
+
+    fn px(v: i32) -> Px {
+        Px::from_px(v)
+    }
+
+    #[test]
+    fn start_and_end_pack_to_one_side() {
+        assert_eq!(
+            justify_offsets(JustifyContent::FlexStart, px(30), 3),
+            (px(0), px(0))
+        );
+        assert_eq!(
+            justify_offsets(JustifyContent::FlexEnd, px(30), 3),
+            (px(30), px(0))
+        );
+    }
+
+    #[test]
+    fn center_takes_half_the_free_space_as_lead() {
+        assert_eq!(
+            justify_offsets(JustifyContent::Center, px(30), 3),
+            (px(15), px(0))
+        );
+    }
+
+    #[test]
+    fn space_between_spreads_between_items_only() {
+        // 20 px over two gaps among three items.
+        assert_eq!(
+            justify_offsets(JustifyContent::SpaceBetween, px(20), 3),
+            (px(0), px(10))
+        );
+    }
+
+    #[test]
+    fn space_between_with_one_item_falls_back_to_start() {
+        assert_eq!(
+            justify_offsets(JustifyContent::SpaceBetween, px(20), 1),
+            (px(0), px(0))
+        );
+    }
+
+    #[test]
+    fn space_around_gives_each_item_half_a_share_at_its_ends() {
+        // 40 px over two items: each gets 20, so 10 at each end.
+        assert_eq!(
+            justify_offsets(JustifyContent::SpaceAround, px(40), 2),
+            (px(10), px(20))
+        );
+    }
+
+    #[test]
+    fn space_evenly_puts_equal_space_everywhere() {
+        // 30 px over three slots (two items plus the ends): 10 each.
+        assert_eq!(
+            justify_offsets(JustifyContent::SpaceEvenly, px(30), 2),
+            (px(10), px(10))
+        );
+    }
+
+    #[test]
+    fn negative_free_space_never_spreads() {
+        // Items overflow the line, so the spread modes fall back to packing at the start.
+        for mode in [
+            JustifyContent::SpaceBetween,
+            JustifyContent::SpaceAround,
+            JustifyContent::SpaceEvenly,
+        ] {
+            assert_eq!(
+                justify_offsets(mode, px(-20), 3),
+                (px(0), px(0)),
+                "{mode:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn gap_resolves_and_never_goes_negative() {
+        assert_eq!(resolve_gap(Dimension::Length(px(7)), px(100)), px(7));
+        assert_eq!(resolve_gap(Dimension::Length(px(-5)), px(100)), px(0));
+        assert_eq!(resolve_gap(Dimension::Auto, px(100)), px(0));
+    }
 }

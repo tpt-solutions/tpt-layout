@@ -89,6 +89,12 @@ pub(crate) fn block_size(style: &BoxStyle, cb_height: Option<Px>, extra: Px) -> 
         .map(|v| to_content(style, v, extra))
 }
 
+/// Content height implied by `aspect-ratio` for an `auto` height, given the content width.
+pub(crate) fn aspect_height(style: &BoxStyle, content_width: Px) -> Option<Px> {
+    let ratio = style.aspect_ratio.filter(|r| r.is_finite() && *r > 0.0)?;
+    Some(Px::from_f32(content_width.to_f32() / ratio))
+}
+
 /// Applies `min-height`/`max-height` to a content height.
 pub(crate) fn clamp_block(style: &BoxStyle, cb_height: Option<Px>, extra: Px, content: Px) -> Px {
     let min = style
@@ -133,5 +139,81 @@ pub(crate) fn inline_size(style: &BoxStyle, sides: &Sides, cb_width: Px) -> (Px,
                 sides.margin.right,
             )
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::aspect_height;
+    use crate::{px::Px, style::BoxStyle};
+
+    #[test]
+    fn aspect_height_divides_width_by_ratio() {
+        let style = BoxStyle {
+            aspect_ratio: Some(2.0),
+            ..BoxStyle::default()
+        };
+        assert_eq!(
+            aspect_height(&style, Px::from_px(100)),
+            Some(Px::from_px(50))
+        );
+    }
+
+    #[test]
+    fn missing_or_invalid_ratio_gives_none() {
+        for ratio in [
+            None,
+            Some(0.0),
+            Some(-1.0),
+            Some(f32::NAN),
+            Some(f32::INFINITY),
+        ] {
+            let style = BoxStyle {
+                aspect_ratio: ratio,
+                ..BoxStyle::default()
+            };
+            assert_eq!(aspect_height(&style, Px::from_px(100)), None, "{ratio:?}");
+        }
+    }
+}
+
+#[cfg(test)]
+mod length_tests {
+    use super::{clamp_block, to_content};
+    use crate::{
+        px::Px,
+        style::{BoxSizing, BoxStyle, Dimension},
+    };
+
+    fn px(v: i32) -> Px {
+        Px::from_px(v)
+    }
+
+    #[test]
+    fn content_box_sizes_are_already_content_sizes() {
+        let style = BoxStyle::default();
+        assert_eq!(to_content(&style, px(100), px(20)), px(100));
+    }
+
+    #[test]
+    fn border_box_sizes_subtract_the_extra_and_never_go_negative() {
+        let style = BoxStyle {
+            box_sizing: BoxSizing::BorderBox,
+            ..BoxStyle::default()
+        };
+        assert_eq!(to_content(&style, px(100), px(20)), px(80));
+        assert_eq!(to_content(&style, px(10), px(20)), px(0));
+    }
+
+    #[test]
+    fn min_and_max_height_clamp_the_content_height() {
+        let style = BoxStyle {
+            min_height: Dimension::Length(px(40)),
+            max_height: Dimension::Length(px(60)),
+            ..BoxStyle::default()
+        };
+        assert_eq!(clamp_block(&style, None, px(0), px(10)), px(40));
+        assert_eq!(clamp_block(&style, None, px(0), px(50)), px(50));
+        assert_eq!(clamp_block(&style, None, px(0), px(90)), px(60));
     }
 }

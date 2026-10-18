@@ -13,6 +13,10 @@ cargo test --all-targets
 
 echo "== clippy"
 cargo clippy --all-targets -- -D warnings
+echo "== fmt"
+cargo fmt --check
+echo "== doc"
+RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
 
 echo "== examples"
 cargo build --examples

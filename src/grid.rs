@@ -1,4 +1,4 @@
-//! CSS Grid layout (TODO Phase 3).
+//! CSS Grid layout.
 //!
 //! Algorithm (single pass, no convergence loop):
 //! 1. Resolve placements: named areas, explicit lines and spans, then auto-placement in the
@@ -12,10 +12,10 @@
 //! 5. Position each item in its cell: shift it into place, then align it within the cell.
 //!
 //! Simplifications, documented in TODO.md:
-//! - Named line names (`[name]`) are not supported. Named areas are.
 //! - Content contributions from items spanning several tracks are spread over the last
 //!   content-sized track they span, rather than solved exactly.
-//! - `justify-content` and `align-content` are not applied (tracks fill the container).
+//! - `justify-content` and `align-content` only place tracks that leave free space. `fr` tracks
+//!   already fill the container, so they are unaffected.
 //! - Intrinsic widths for content-sized tracks use `intrinsic::max_content`.
 
 use alloc::vec::Vec;
@@ -27,8 +27,8 @@ use crate::{
     px::Px,
     sizing::{clamp_inline, to_content, Sides},
     style::{
-        AlignItems, Dimension, Direction, GridAutoFlow, GridLine, Position, TrackSize, Tracks,
-        MAX_AREA_DIM,
+        AlignContent, AlignItems, Dimension, Direction, GridAutoFlow, GridLine, GridTemplate,
+        JustifyContent, TrackSize, Tracks, MAX_AREA_DIM, MAX_TRACKS,
     },
     tree::{BoxTree, NodeId},
 };
@@ -74,8 +74,13 @@ pub(crate) fn layout_grid(
         return (top, Margin::ZERO, None);
     };
     let style = node.style;
-    let template = node.grid;
-    let rtl = style.direction == Direction::Rtl;
+    let explicit_columns = node.grid.columns.len as usize;
+    let template = expand_auto_fill(
+        node.grid,
+        content.width,
+        gap(style.column_gap, content.width),
+    );
+    let rtl = tree.effective_direction(id) == Direction::Rtl;
     let column_flow = style.grid_auto_flow == GridAutoFlow::Column;
     let col_gap = gap(style.column_gap, content.width);
     let row_gap = gap(style.row_gap, content.width);
@@ -84,11 +89,11 @@ pub(crate) fn layout_grid(
     let explicit_rows = template.rows.len as usize;
 
     let mut entries = Vec::new();
-    for child in tree.children(id).to_vec() {
+    for child in tree.laid_children(id).to_vec() {
         let Some(child_node) = tree.get(child) else {
             continue;
         };
-        if child_node.style.position == Position::Absolute {
+        if child_node.style.position.is_out_of_flow() {
             deferred.push(Deferred {
                 id: child,
                 static_x: content.x,
@@ -153,6 +158,9 @@ pub(crate) fn layout_grid(
             mark: 0..0,
         });
     }
+    // `auto-fit`: repeated columns that no item occupies collapse to zero width.
+    let template = collapse_empty_auto_fit(template, explicit_columns, &items, col_count);
+
     // 2. Column tracks. Content sizes come from single-span items.
     let mut col_content = alloc::vec![Px::ZERO; col_count];
     for item in &items {
@@ -171,7 +179,16 @@ pub(crate) fn layout_grid(
         col_gap,
         &col_content,
     );
-    let col_starts = starts(&cols, col_gap);
+    let col_starts = starts(
+        &cols,
+        col_gap,
+        spacing(
+            content.width,
+            &cols,
+            col_gap,
+            Distribution::from_justify(style.justify_content),
+        ),
+    );
     let col_width = |item: &GridItem| span_extent(&cols, item.col, item.col_span, col_gap);
 
     // 3. Lay out every item once at its span width.
@@ -251,7 +268,16 @@ pub(crate) fn layout_grid(
         row_gap,
         &row_content,
     );
-    let row_starts = starts(&rows, row_gap);
+    let row_starts = starts(
+        &rows,
+        row_gap,
+        spacing(
+            content.height.unwrap_or(Px::ZERO),
+            &rows,
+            row_gap,
+            Distribution::from_align(style.align_content),
+        ),
+    );
 
     // 5. Position each item in its cell.
     for item in &items {
@@ -440,10 +466,9 @@ fn auto_place(
     };
     let free =
         |occupied: &Vec<Vec<bool>>, major: usize, minor: usize, ms: usize, ns: usize| -> bool {
-            (major..major + ms).all(|r| {
-                occupied.get(r).is_none_or(|row| {
-                    (minor..minor + ns).all(|c| !row.get(c).copied().unwrap_or(false))
-                })
+            (major..major + ms).all(|r| match occupied.get(r) {
+                None => true,
+                Some(row) => (minor..minor + ns).all(|c| !row.get(c).copied().unwrap_or(false)),
             })
         };
 
@@ -592,13 +617,162 @@ fn size_tracks(
     sizes
 }
 
-/// Start offset of each track, including gaps before it.
-fn starts(sizes: &[Px], track_gap: Px) -> Vec<Px> {
+/// Adds the `auto-fill` columns to the explicit ones. Each column has the fixed width from the
+/// template, and as many fit `container` with `gap` between them, with at least one. The result
+/// is capped at `MAX_TRACKS` columns.
+fn expand_auto_fill(template: GridTemplate, container: Px, gap: Px) -> GridTemplate {
+    let Some(width) = template.auto_fill_columns else {
+        return template;
+    };
+    if width <= Px::ZERO {
+        return template;
+    }
+    let explicit = template.columns.as_slice();
+    let room = MAX_TRACKS.saturating_sub(explicit.len());
+    let fit = ((container + gap).0 / (width + gap).0).max(1) as usize;
+    let count = fit.min(room);
+    let mut sizes: Vec<TrackSize> = explicit.to_vec();
+    sizes.extend((0..count).map(|_| TrackSize::Fixed(Dimension::Length(width))));
+    let columns = rebuilt_tracks(&sizes, template.columns);
+    GridTemplate {
+        columns,
+        ..template
+    }
+}
+
+/// Track list with `sizes`, keeping the line names of `original`. Falls back to `original` when
+/// `sizes` has too many tracks.
+fn rebuilt_tracks(sizes: &[TrackSize], original: Tracks) -> Tracks {
+    match Tracks::try_new(sizes) {
+        Some(mut tracks) => {
+            tracks.line_names = original.line_names;
+            tracks
+        }
+        None => original,
+    }
+}
+
+/// For `auto-fit`, sets to zero every repeated column (past the `explicit` ones) that no item
+/// occupies. Other templates are returned unchanged.
+fn collapse_empty_auto_fit(
+    template: GridTemplate,
+    explicit: usize,
+    items: &[GridItem],
+    col_count: usize,
+) -> GridTemplate {
+    if !template.auto_fit || template.auto_fill_columns.is_none() {
+        return template;
+    }
+    let mut used = alloc::vec![false; col_count.max(template.columns.len as usize)];
+    for item in items {
+        for slot in &mut used[item.col..item.col + item.col_span] {
+            *slot = true;
+        }
+    }
+    let mut sizes: Vec<TrackSize> = template.columns.as_slice().to_vec();
+    for (index, size) in sizes.iter_mut().enumerate() {
+        if index >= explicit && !used[index] {
+            *size = TrackSize::Fixed(Dimension::Length(Px::ZERO));
+        }
+    }
+    let columns = rebuilt_tracks(&sizes, template.columns);
+    GridTemplate {
+        columns,
+        ..template
+    }
+}
+
+/// How leftover space along one axis is shared out. Mirrors `justify-content`, with `Stretch`
+/// meaning start (the tracks keep their sizes).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Distribution {
+    Start,
+    End,
+    Center,
+    Between,
+    Around,
+    Evenly,
+}
+
+impl Distribution {
+    fn from_justify(value: JustifyContent) -> Self {
+        match value {
+            JustifyContent::FlexStart => Distribution::Start,
+            JustifyContent::FlexEnd => Distribution::End,
+            JustifyContent::Center => Distribution::Center,
+            JustifyContent::SpaceBetween => Distribution::Between,
+            JustifyContent::SpaceAround => Distribution::Around,
+            JustifyContent::SpaceEvenly => Distribution::Evenly,
+        }
+    }
+
+    fn from_align(value: AlignContent) -> Self {
+        match value {
+            AlignContent::Stretch | AlignContent::FlexStart => Distribution::Start,
+            AlignContent::FlexEnd => Distribution::End,
+            AlignContent::Center => Distribution::Center,
+            AlignContent::SpaceBetween => Distribution::Between,
+            AlignContent::SpaceAround => Distribution::Around,
+        }
+    }
+}
+
+/// Offsets for the tracks along one axis: a `lead` before the first track and an `extra` gap
+/// added after each one.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct Spacing {
+    lead: Px,
+    extra: Px,
+}
+
+/// Shares the free space left in a `container` length after the tracks and their gaps.
+fn spacing(container: Px, sizes: &[Px], track_gap: Px, mode: Distribution) -> Spacing {
+    let used = sizes.iter().fold(Px::ZERO, |acc, size| acc + *size)
+        + track_gap * (sizes.len().saturating_sub(1) as i32);
+    let free = (container - used).max(Px::ZERO);
+    let n = sizes.len() as i32;
+    if n == 0 {
+        return Spacing::default();
+    }
+    match mode {
+        Distribution::Start => Spacing::default(),
+        Distribution::End => Spacing {
+            lead: free,
+            extra: Px::ZERO,
+        },
+        Distribution::Center => Spacing {
+            lead: Px(free.0 / 2),
+            extra: Px::ZERO,
+        },
+        Distribution::Between if n > 1 => Spacing {
+            lead: Px::ZERO,
+            extra: Px(free.0 / (n - 1)),
+        },
+        Distribution::Between => Spacing::default(),
+        Distribution::Around => {
+            let each = Px(free.0 / n);
+            Spacing {
+                lead: Px(each.0 / 2),
+                extra: each,
+            }
+        }
+        Distribution::Evenly => {
+            let each = Px(free.0 / (n + 1));
+            Spacing {
+                lead: each,
+                extra: each,
+            }
+        }
+    }
+}
+
+/// Start offset of each track, including gaps before it and the spacing from `spacing`.
+fn starts(sizes: &[Px], track_gap: Px, spacing: Spacing) -> Vec<Px> {
     let mut out = Vec::with_capacity(sizes.len());
-    let mut cursor = Px::ZERO;
+    let mut cursor = spacing.lead;
     for size in sizes {
         out.push(cursor);
-        cursor = cursor + *size + track_gap;
+        cursor = cursor + *size + track_gap + spacing.extra;
     }
     out
 }
@@ -618,5 +792,54 @@ fn align_offset(align: AlignItems, cell: Px, outer: Px) -> Px {
         AlignItems::FlexEnd => (cell - outer).max(Px::ZERO),
         AlignItems::Center => ((cell - outer) / 2).max(Px::ZERO),
         _ => Px::ZERO,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{spacing, starts, Distribution};
+    use crate::px::Px;
+
+    fn px(v: i32) -> Px {
+        Px::from_px(v)
+    }
+
+    #[test]
+    fn free_space_is_clamped_at_zero() {
+        // Tracks wider than the container leave nothing to distribute.
+        let s = spacing(px(50), &[px(40), px(40)], px(0), Distribution::Center);
+        assert_eq!(s.lead, px(0));
+    }
+
+    #[test]
+    fn between_with_one_track_falls_back_to_start() {
+        let s = spacing(px(100), &[px(40)], px(0), Distribution::Between);
+        assert_eq!(s.lead, px(0));
+        assert_eq!(s.extra, px(0));
+    }
+
+    #[test]
+    fn around_gives_half_a_share_at_each_end() {
+        // 120 px over two tracks: each track gets 60, half of it (30) at each end.
+        let s = spacing(px(200), &[px(40), px(40)], px(0), Distribution::Around);
+        assert_eq!(s.lead, px(30));
+        assert_eq!(s.extra, px(60));
+    }
+
+    #[test]
+    fn starts_include_gaps_and_spacing() {
+        let sizes = [px(10), px(10), px(10)];
+        let s = spacing(px(100), &sizes, px(4), Distribution::Start);
+        assert_eq!(
+            starts(&sizes, px(4), s).as_slice(),
+            &[px(0), px(14), px(28)]
+        );
+    }
+
+    #[test]
+    fn empty_track_list_has_no_spacing() {
+        let s = spacing(px(100), &[], px(0), Distribution::Evenly);
+        assert_eq!(s.lead, px(0));
+        assert_eq!(s.extra, px(0));
     }
 }

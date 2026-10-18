@@ -15,12 +15,14 @@ fn breaks_on_word_boundaries_within_max_width() {
             LineBox {
                 width: Px::from_px(70),
                 height: Px::from_px(20),
-                baseline: Px::from_px(15)
+                baseline: Px::from_px(15),
+                text: 0..7,
             },
             LineBox {
                 width: Px::from_px(30),
                 height: Px::from_px(20),
-                baseline: Px::from_px(15)
+                baseline: Px::from_px(15),
+                text: 8..11,
             },
         ]
     );
@@ -59,4 +61,11 @@ fn text_box_height_and_baseline_come_from_its_lines() {
     let node = tree.get(text).unwrap().layout;
     assert_eq!(node.height, 40.0);
     assert_eq!(node.baseline, 15.0);
+}
+
+#[test]
+fn line_ranges_follow_newlines_and_skip_break_spaces() {
+    let lines = mock().line_boxes("ab\ncd ef", Px::from_px(1000));
+    let ranges: Vec<_> = lines.iter().map(|l| l.text.clone()).collect();
+    assert_eq!(ranges, vec![0..2, 3..8]);
 }

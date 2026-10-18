@@ -71,7 +71,7 @@ Status: `[x]` is done and tested. `[ ]` is not done. Notes after an item say wha
 - [x] `paginate()`: splits the continuous layout into pages
 - [x] Oversized box handling (taller than a page)
 - [x] Multi-column layouts (column-count/gap, balancing). Note: children are balanced whole; they are not split across columns.
-- [x] Table layout module (row/column sizing, header repeat across pages, row break rules). Note: no `colspan`/`rowspan`, no `border-collapse`.
+- [x] Table layout module (row/column sizing, header repeat across pages, row break rules). Note: no `rowspan`, no `border-collapse` (`colspan` was added later, see Phase 6).
 - [ ] **Milestone:** tpt-doc can generate paginated PDFs with correct page breaks. Note: this crate produces the page breaks; PDF output belongs to tpt-doc.
 
 ## Phase 5: Incremental Layout & Polish (Weeks 13-14)
@@ -97,5 +97,77 @@ Status: `[x]` is done and tested. `[ ]` is not done. Notes after an item say wha
 - [x] Zero C-FFI / no unsafe audit (`#![forbid(unsafe_code)]`, plus a grep in `scripts/check.sh` and CI)
 
 ## Open items to confirm later
-- [ ] Final Rust API shape for tables and RTL (not in spec). Current choices: tables use `Display::Table`, `TableRow` and `TableCell`; RTL is `BoxStyle::direction`.
+- [x] Final Rust API shape for tables and RTL (not in spec). Decided: keep the current names. Tables use `Display::Table`, `TableRow` and `TableCell`; RTL is `BoxStyle::direction`. Recorded in CHANGELOG.md.
 - [ ] Real tpt-text / tpt-canvas / tpt-math integration once those crates exist
+
+## Phase 6: Review follow-ups (from the 2026-10 platform review)
+Plan: `C:\Users\phill\.claude\plans\review-platform-for-bugs-optimized-allen.md`
+
+### 6A. Bugs and stale items
+- [x] `relayout` runs a full pass when root or constraints differ from the last full layout
+- [x] Fix stale docs (README writing-mode note, `grid.rs` named-lines note, "TODO Phase N" module headers)
+- [x] CI and `scripts/check.sh` run `cargo fmt --check` and `cargo doc -D warnings`
+- [x] Merged duplicated Added/Fixed sections under 1.0.0 in CHANGELOG.md
+- [x] `tree.rs` `push`: the `u32` overflow `expect` is the only library panic path. Decided to keep: it needs more than 4 billion nodes. Revisit if `insert` ever returns `Result`
+- [x] Multi-column (`pagination.rs`): negative column width with a large gap is clamped to zero, and the balanced-height arithmetic saturates. Test: `oversized_column_gap_clamps_instead_of_going_negative`
+- [ ] Multi-column: children are still not split across columns (a tall child is balanced whole)
+- [x] Slot reuse in `BoxTree::remove`: free list plus per-node generations, so stale ids resolve to `None`. Tests in `tests/tree_edit.rs`
+- [x] Tracks beyond `MAX_TRACKS`: the review said these were silently dropped, but `Tracks::new` already panics with a message. Added `Tracks::try_new`, which returns `None` instead
+- [x] `BoxTree` move/insert API: `insert_child_at`, `insert_before`, `detach`, `reparent`. Tests in `tests/tree_edit.rs`
+
+### 6B. Missing features for documents
+- [x] Orphans/widows for inline paragraphs. Done for blocks whose children are all inline: their line boxes are split with orphan and widow control, like text leaves. Blocks that mix inline and block children still do not split. Tests: `tests/paragraph_split.rs`
+- [x] `text-align`: start, center, end and justify (`BoxStyle::text_align`, `TextAlign`). RTL start aligns right, trailing spaces are ignored, and justify leaves the last line at start. Tests: `tests/text_align.rs`
+- [x] `text-indent` on the first line of an inline run that starts its block. Block-level text leaves are not indented. Tests: `tests/text_indent.rs`
+- [x] `line-height` (`BoxStyle::line_height`): a length adds half-leading above and below each inline line. `auto` keeps the natural height. Percentages and numbers are not supported. Tests: `tests/inline_leading.rs`
+- [x] `white-space: nowrap` (`WhiteSpace::NoWrap`): inline content stays on one line and may overflow. `pre` is listed below.
+- [x] `white-space: pre` (`WhiteSpace::Pre`): no wrapping, runs of spaces kept, and each newline starts a new line. Blank lines (two newlines in a row) are dropped and tabs are not expanded. Tests: `tests/white_space_pre.rs`
+- [x] `white-space: pre-wrap` (`WhiteSpace::PreWrap`): as `pre`, but lines wrap at spaces. Tests: `tests/white_space_pre.rs`
+- [x] Inline padding, border and margin on spans and links: their horizontal space is added as gaps around the children, and the element's frame covers it. Vertical padding does not change the line box, as in CSS. Tests: `tests/inline_padding.rs`
+- [ ] Parent top-margin collapse with an empty first child (`flow.rs`)
+- [x] Flex `min-width: auto` as min-content. Approximate: widest word for text, sum for flex rows, max otherwise, capped by a fixed width. Only for row main axes; column items keep a zero minimum. Tests: `tests/flex_min_width.rs`
+- [x] Table `colspan` (`BoxStyle::column_span`): a spanning cell widens its columns evenly when they are too narrow, and is laid out across them. Tests: `tests/table_colspan.rs`
+- [x] `table-layout: fixed` (`BoxStyle::table_layout`): the first row's declared cell widths set their columns, and undeclared columns share the rest equally. Tests: `tests/table_fixed.rs`
+- [x] Table `rowspan` (`BoxStyle::row_span`): cells are placed on a grid, so later rows skip columns held from above. A spanning cell must fit its rows, and any shortfall goes to its last row. Pagination keeps a spanning cell with the row it starts in. Tests: `tests/table_rowspan.rs`
+- [x] Grid `justify-content` and `align-content`: leftover space is shared out for fixed tracks. `fr` tracks already fill the container. Tests: `tests/grid_alignment.rs`
+- [x] Grid `repeat()`: `Tracks::repeat(count, pattern)` writes a fixed pattern out (up to `MAX_TRACKS`). `repeat(auto-fill, <px>)` is `GridTemplate::auto_fill_columns`, which fits as many fixed px columns as the container allows, after any explicit columns. `auto-fit` is `GridTemplate::auto_fit`: the same columns, with the ones no item occupies collapsed to zero. Auto repeats with fr, and non-px widths, are not supported. Tests: `tests/grid_repeat.rs`
+- [x] `display: none`: the box takes no space, paints nothing, and its children are skipped. `BoxTree::children` still returns it, and layout uses the crate-private `laid_children`. Toggling it stays incremental. Tests: `tests/display_none.rs`. Note: it does not break an inline run.
+- [x] `aspect-ratio` (`BoxStyle::aspect_ratio`): an auto height comes from the content width in block flow. Not applied in flex, grid or intrinsic sizing. Tests: `tests/aspect_and_positioning.rs`
+- [x] `position: fixed` is laid out as absolute. Deviation: the containing block is the nearest positioned ancestor, not the viewport, since there is no viewport.
+- [x] `position: sticky` offsets like relative and never sticks, since there is no scroll model.
+- [x] Header/footer placement: `PageLayout::place_running` adds the same header and footer nodes to every page, in the space reserved by `header_height`/`footer_height`. Per-page content such as page numbers is not supported. Tests: `tests/running_content.rs`
+- [ ] Richer `TextMeasurer` input (font, size, language, direction). Do this before publishing
+- [ ] API-deviations note vs `spec.txt` (`&mut BoxTree`/`NodeId`/`Px` instead of `&mut BoxNode`/`f32`)
+
+### 6C. Tests and CI
+- [x] Test: `relayout` with changed constraints
+- [x] Test: `remove` then `relayout` matches a full layout
+- [ ] Tests still missing: inline-paragraph pagination, RTL plus vertical modes, percentages in nested roots, tables across pages, triple writing-mode nesting
+- [x] Property tests: layout idempotence, and pagination gives each text box contiguous, disjoint line ranges from 0 (`tests/properties.rs`, seeded generator)
+- [x] Unit tests in `src/`: grid track spacing, aspect-ratio and length helpers, flex justify and gap, and `is_boundary` in the engine. Still missing for table and the rest of flex
+- [x] MSRV: `rust-version = "1.74"` in Cargo.toml. Verified locally by running the full test suite on 1.74; the `msrv` CI job does the same (it deletes the tracked Cargo.lock, which newer cargo writes in a format 1.74 cannot read)
+- [ ] CI: `rust-toolchain.toml`, cargo cache, cross-OS determinism hash comparison, run wasm tests, optional `cargo-fuzz`
+- [ ] Push and confirm CI is green on GitHub (never run yet)
+
+### 6D. Differentiators
+- [x] Stable layout fingerprint: `snapshot::fingerprint`, an FNV-1a hash over fixed-point geometry (`tests/snapshot.rs`)
+- [ ] `explain(node)`: why a box has its size. **Decision: defer.** Useful, but it needs a design for recording the constraint chain in every pass, and no one has asked for it yet.
+- [x] Layout diff: `snapshot::diff` compares a clone of the tree taken before an edit with the tree after it, reporting changed, added and removed nodes
+- [ ] `fit_to_pages(n)` helper. **Decision: do not build.** The meaning is not defined (scale, reflow or trim?), so it would be a guess. Build it when a specific use case says what it should do.
+- [ ] Serde for trees and results. **Decision: not in the core.** The core stays dependency-free, so serialization belongs in a separate crate that depends on serde. Not started.
+
+### 6E. Adoption
+- [x] SVG debug renderer: `svg::SvgCanvas` implements `Canvas`, and `svg::render_svg` draws it. Text is drawn with its characters, inline and block-level. Block-level lines are also outlined. Vertical text is drawn one character per cell. `LineBox` now carries its byte range (a breaking change, noted in CHANGELOG). Example: `examples/svg_render.rs`
+- [ ] CLI `tpt-layout` (separate workspace crate): JSON tree in, layout JSON or SVG out. **Decision: a separate crate, so the core stays dependency-free.** Not started; it needs a JSON parser and so depends on the serde decision above.
+- [ ] wasm-bindgen playground (static page, GitHub Pages)
+- [x] Starter templates, golden-tested as SVG (`src/templates.rs`, `tests/templates.rs`, `examples/templates.rs`): invoice (table with a header row), dashboard (grid), navbar (flex), resume (two columns). Their text is inline, so the SVG shows the words.
+- [x] Also added: RTL page, vertical page, and a two-column newsletter (`tests/golden/templates/`). Vertical text stacks one character per cell in the SVG, which is exact only for the fixed-advance measurer.
+- [x] Report template with orphan and widow control, paginated with `Template::paginate` (`templates::report`; `examples/report.rs`; `tests/templates_report.rs`).
+- [ ] Invoice does not repeat its header across pages yet (a paginated invoice would need the table headers to repeat, which pagination already does for tables).
+- [x] `direction` and `text-align` are inherited, as in CSS. Both have an `Inherit` default, resolved by walking up the tree (`BoxTree::effective_direction` / `effective_text_align`). Tests: `tests/inheritance.rs`. `line-height` and `white-space` are not inherited, and neither is `text-indent`.
+- [ ] `BoxStyle` builder and fluent tree builder
+- [ ] Optional CSS-subset parser behind a `css` feature
+- [x] Docs: `docs/quickstart.md` (walkthrough of `examples/quickstart.rs`) and `docs/text-measurer.md` (the trait's rules). Linked from README.
+- [ ] mdbook, cookbook, CSS-differences table; docs.rs metadata. `#![warn(missing_docs)]` gives 206 warnings today (124 in `style.rs`, mostly enum variants and fields); enable it after a documentation pass
+- [ ] Publish readiness: LICENSE, Cargo.toml metadata, flip `publish`, tag, release workflow, issue template
+- [ ] Example with a real font-backed `TextMeasurer` (dev-dependency)

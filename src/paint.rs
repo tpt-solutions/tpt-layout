@@ -1,4 +1,4 @@
-//! Paint metadata (TODO Phase 5): paint order and clip regions. tpt-layout still does not draw.
+//! Paint metadata: paint order and clip regions. tpt-layout still does not draw.
 //!
 //! [`paint_order`] lists every laid-out box in the order a renderer should paint it:
 //! - by `z-index`, lowest first (boxes without one count as `0`), and
@@ -50,7 +50,7 @@ fn collect(tree: &BoxTree, id: NodeId, clip: Option<Rect>, out: &mut Vec<PaintIt
     } else {
         clip
     };
-    for child in tree.children(id).to_vec() {
+    for child in tree.laid_children(id).to_vec() {
         collect(tree, child, child_clip, out);
     }
 }

@@ -121,7 +121,13 @@ fn check_golden(name: &str, actual: &str) {
             path.display()
         )
     });
-    assert_eq!(actual, expected, "golden mismatch for {name}");
+    // Git on Windows may check the golden files out with CRLF endings; compare LF-normalized text.
+    let normalize = |s: &str| s.replace("\r\n", "\n");
+    assert_eq!(
+        normalize(actual),
+        normalize(&expected),
+        "golden mismatch for {name}"
+    );
 }
 
 fn golden_flow() -> String {

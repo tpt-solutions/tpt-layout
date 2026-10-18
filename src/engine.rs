@@ -1,4 +1,4 @@
-//! Layout orchestrator (TODO Phase 5): full layout, incremental re-layout, and the context that
+//! Layout orchestrator: full layout, incremental re-layout, and the context that
 //! the passes share.
 //!
 //! Incremental layout relies on *layout boundaries* (see `is_boundary` for the exact rules). A
@@ -72,14 +72,14 @@ pub fn layout_document(
 ) -> Result<LayoutResult, TreeError> {
     layout_flow(tree, root, constraints.width, ctx.measurer)?;
     tree.clear_dirty();
+    tree.set_last_layout(root, constraints);
     Ok(summary(tree, root))
 }
 
 /// Re-lays out only what changed since the last pass. Falls back to a full layout when the
 /// changes cannot be confined to a layout boundary.
 ///
-/// `constraints` must be the ones used for the last full pass. Changing them requires
-/// [`layout_document`].
+/// If `root` or `constraints` differ from the last full pass, this runs a full pass instead.
 pub fn relayout(
     tree: &mut BoxTree,
     root: NodeId,
@@ -88,6 +88,9 @@ pub fn relayout(
 ) -> Result<LayoutResult, TreeError> {
     if tree.get(root).is_none() {
         return Err(TreeError::NotFound(root));
+    }
+    if tree.last_layout() != Some((root, constraints)) {
+        return layout_document(tree, root, constraints, ctx);
     }
     let nodes = tree.subtree(root);
     let dirty: Vec<NodeId> = nodes
@@ -212,7 +215,7 @@ pub(crate) fn is_boundary(tree: &BoxTree, id: NodeId) -> bool {
     // detached re-layout does not collapse margins. So the boundary establishes a formatting
     // context, or has top padding or border to separate it.
     let establishes_context = style.overflow != Overflow::Visible
-        || style.position == Position::Absolute
+        || style.position.is_out_of_flow()
         || matches!(
             style.display,
             Display::Flex
@@ -292,4 +295,93 @@ fn relayout_boundary(pass: &Pass, tree: &mut BoxTree, boundary: NodeId) -> bool 
     let _ = layout_detached(pass, tree, boundary, slot, &mut scratch);
     tree.frame(boundary)
         .is_some_and(|after| after.baseline == before)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_boundary;
+    use crate::{
+        px::Px,
+        style::{BoxStyle, Dimension, Display, Overflow, Position},
+        tree::BoxTree,
+    };
+
+    fn px(v: i32) -> Dimension {
+        Dimension::Length(Px::from_px(v))
+    }
+
+    /// A block-flow root holding one child with `style`. Returns the tree and the child.
+    fn child_of_block(style: BoxStyle) -> (BoxTree, crate::tree::NodeId) {
+        let mut tree = BoxTree::new();
+        let root = tree.insert(BoxStyle::default());
+        let child = tree.insert(style);
+        tree.append_child(root, child).unwrap();
+        (tree, child)
+    }
+
+    #[test]
+    fn positioned_box_with_fixed_size_and_a_context_is_a_boundary() {
+        let (tree, child) = child_of_block(BoxStyle {
+            position: Position::Relative,
+            overflow: Overflow::Hidden,
+            width: px(100),
+            height: px(50),
+            ..BoxStyle::default()
+        });
+        assert!(is_boundary(&tree, child));
+    }
+
+    #[test]
+    fn auto_height_is_not_a_boundary() {
+        let (tree, child) = child_of_block(BoxStyle {
+            position: Position::Relative,
+            overflow: Overflow::Hidden,
+            width: px(100),
+            ..BoxStyle::default()
+        });
+        assert!(!is_boundary(&tree, child));
+    }
+
+    #[test]
+    fn static_box_is_not_a_boundary() {
+        let (tree, child) = child_of_block(BoxStyle {
+            overflow: Overflow::Hidden,
+            width: px(100),
+            height: px(50),
+            ..BoxStyle::default()
+        });
+        assert!(!is_boundary(&tree, child));
+    }
+
+    #[test]
+    fn inline_element_is_not_a_boundary() {
+        let (tree, child) = child_of_block(BoxStyle {
+            display: Display::Inline,
+            position: Position::Relative,
+            overflow: Overflow::Hidden,
+            width: px(100),
+            height: px(50),
+            ..BoxStyle::default()
+        });
+        assert!(!is_boundary(&tree, child));
+    }
+
+    #[test]
+    fn flex_child_is_not_a_boundary() {
+        // A flex container can resize its items, so an item cannot be re-laid-out on its own.
+        let mut tree = BoxTree::new();
+        let root = tree.insert(BoxStyle {
+            display: Display::Flex,
+            ..BoxStyle::default()
+        });
+        let child = tree.insert(BoxStyle {
+            position: Position::Relative,
+            overflow: Overflow::Hidden,
+            width: px(100),
+            height: px(50),
+            ..BoxStyle::default()
+        });
+        tree.append_child(root, child).unwrap();
+        assert!(!is_boundary(&tree, child));
+    }
 }

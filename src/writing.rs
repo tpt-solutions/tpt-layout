@@ -1,4 +1,4 @@
-//! Writing modes (TODO Phase 5).
+//! Writing modes.
 //!
 //! A box's effective mode is its own mode, or its parent's when its mode is `Inherit`; the top of a
 //! tree is `HorizontalTb`. A box whose effective mode differs from its caller's is a *root* of
@@ -266,7 +266,7 @@ fn root_members(tree: &BoxTree, id: NodeId) -> Vec<NodeId> {
     let mut stack = alloc::vec![id];
     while let Some(node) = stack.pop() {
         out.push(node);
-        for child in tree.children(node).iter().rev() {
+        for child in tree.laid_children(node).iter().rev() {
             if root_mode(tree, *child).is_none() {
                 stack.push(*child);
             } else {

@@ -1,4 +1,4 @@
-//! Pagination and multi-column layout (TODO Phase 4).
+//! Pagination and multi-column layout.
 //!
 //! Pagination runs on a finished layout and does not move boxes. It collects *atoms* in document
 //! order (text lines, whole boxes, table rows, and break markers), fills pages with them, and
@@ -9,15 +9,19 @@
 //!   one, and add a blank page when the parity is wrong (page 1 is a right-hand page).
 //! - `break-inside: avoid`: the box is one atom and is never split.
 //! - Text: a paragraph splits between lines, keeping at least `orphans` lines before the break
-//!   and at least `widows` lines after it.
+//!   and at least `widows` lines after it. This applies to block-level text leaves, and to blocks
+//!   whose children are all inline (their inline lines are the lines that split).
 //! - Oversized boxes: a box taller than a page is placed alone and overflows its page.
 //! - Tables: header rows (`table_header`) repeat at the top of each page the table continues to.
 //!
 //! Multi-column layout lays out a container's block children at column width, then fills the
 //! columns greedily to a balanced height. Children are never split across columns.
 //!
-//! Not supported: orphan and widow control for inline text, and header or footer content (page
-//! headers and footers reserve space only).
+//! Running headers and footers reserve space with `header_height` and `footer_height`, and
+//! [`PageLayout::place_running`] adds the same header and footer nodes to every page.
+//!
+//! Not supported: splitting a block that mixes inline and block-level children, and per-page header
+//! or footer content such as page numbers.
 
 use alloc::{collections::VecDeque, vec::Vec};
 use core::ops::Range;
@@ -26,7 +30,8 @@ use crate::{
     flow::{layout_block_children, Containing, Margin, Pass},
     position::Deferred,
     px::Px,
-    style::{Break, Display, Position},
+    sizing::Sides,
+    style::{Break, Display},
     text::LineBox,
     tree::{BoxTree, NodeId},
 };
@@ -163,6 +168,45 @@ impl Atom {
     }
 }
 
+impl PageLayout {
+    /// Adds a running header and footer to every page.
+    ///
+    /// `header` is placed at the top of each page's content area, and `footer` at the bottom, in
+    /// the space reserved by `header_height` and `footer_height`. The same nodes repeat on every
+    /// page, so per-page content such as page numbers is not supported. Their layouts are not
+    /// changed: lay them out separately, with a width of `page_width`, before calling this.
+    pub fn place_running(
+        &mut self,
+        constraints: &PageConstraints,
+        header: Option<NodeId>,
+        footer: Option<NodeId>,
+    ) {
+        let footer_y = constraints.header_height + constraints.content_height();
+        for (index, page) in self.pages.iter_mut().enumerate() {
+            if let Some(node) = header {
+                self.fragments.push(PageFragment {
+                    node,
+                    page: index,
+                    y: 0.0,
+                    height: constraints.header_height.to_f32(),
+                    lines: None,
+                });
+                page.boxes.push(node);
+            }
+            if let Some(node) = footer {
+                self.fragments.push(PageFragment {
+                    node,
+                    page: index,
+                    y: footer_y.to_f32(),
+                    height: constraints.footer_height.to_f32(),
+                    lines: None,
+                });
+                page.boxes.push(node);
+            }
+        }
+    }
+}
+
 /// Splits a laid-out tree into pages. `root` is the box whose descendants are paginated.
 pub fn paginate(tree: &BoxTree, root: NodeId, constraints: &PageConstraints) -> PageLayout {
     let mut atoms = Vec::new();
@@ -180,7 +224,7 @@ fn collect(tree: &BoxTree, id: NodeId, out: &mut Vec<Atom>) {
     let Some(node) = tree.get(id) else { return };
     let Some(frame) = tree.frame(id) else { return };
     let style = node.style;
-    if style.position == Position::Absolute || style.display.is_inline_level() {
+    if style.position.is_out_of_flow() || style.display.is_inline_level() {
         return;
     }
     let (top, height) = (frame.y, frame.height);
@@ -201,11 +245,29 @@ fn collect(tree: &BoxTree, id: NodeId, out: &mut Vec<Atom>) {
         return;
     }
 
-    let has_block_children = tree.children(id).iter().any(|child| {
+    let has_block_children = tree.laid_children(id).iter().any(|child| {
         tree.get(*child).is_some_and(|c| {
-            c.style.position != Position::Absolute && !c.style.display.is_inline_level()
+            !c.style.position.is_out_of_flow() && !c.style.display.is_inline_level()
         })
     });
+    // A block whose children are all inline is divided between its line boxes, like a text leaf.
+    // Its top is the content top, below any border and padding.
+    if !has_block_children && !node.lines.is_empty() && style.break_inside != Break::Avoid {
+        let inset = Sides::of(&style, Px::ZERO);
+        let inset_top = inset.border.top + inset.padding.top;
+        let height = node
+            .lines
+            .iter()
+            .fold(Px::ZERO, |acc, line| acc + line.height);
+        let mut atom = Atom::whole(alloc::vec![id], top + inset_top, height);
+        atom.lines = node.lines.clone();
+        atom.orphans = style.orphans;
+        atom.widows = style.widows;
+        atom.break_before = style.break_before;
+        atom.break_after = style.break_after;
+        out.push(atom);
+        return;
+    }
     let indivisible = style.break_inside == Break::Avoid
         || !has_block_children
         || matches!(style.display, Display::Flex | Display::Grid);
@@ -218,7 +280,7 @@ fn collect(tree: &BoxTree, id: NodeId, out: &mut Vec<Atom>) {
     }
 
     push_marker(out, style.break_before, top);
-    for child in tree.children(id).to_vec() {
+    for child in tree.laid_children(id).to_vec() {
         collect(tree, child, out);
     }
     push_marker(out, style.break_after, top + height);
@@ -236,12 +298,12 @@ fn push_marker(out: &mut Vec<Atom>, kind: Break, top: Px) {
 
 /// Table rows become atoms. Cells are grouped by the row they sit in, using their frames.
 fn collect_table(tree: &BoxTree, table: NodeId, out: &mut Vec<Atom>) {
-    for row in tree.children(table).to_vec() {
+    for row in tree.laid_children(table).to_vec() {
         let cells: Vec<NodeId> = if tree
             .get(row)
             .is_some_and(|n| n.style.display == Display::TableRow)
         {
-            tree.children(row).to_vec()
+            tree.laid_children(row).to_vec()
         } else {
             alloc::vec![row]
         };
@@ -327,7 +389,7 @@ impl Filler {
         self.new_page(doc_top);
         let page_number = self.pages.len();
         let want_even = kind == Break::Left;
-        if page_number.is_multiple_of(2) != want_even {
+        if (page_number % 2 == 0) != want_even {
             self.new_page(doc_top);
         }
     }
@@ -520,7 +582,8 @@ pub(crate) fn layout_columns(
         .resolve(Some(content.width))
         .unwrap_or(Px::ZERO)
         .max(Px::ZERO);
-    let column_width = (content.width - gap * (count - 1)) / count;
+    // Gaps larger than the content leave no room; clamp rather than produce a negative width.
+    let column_width = ((content.width - gap * (count - 1)) / count).max(Px::ZERO);
 
     // Lay the children out in one tall column at column width.
     let column = Containing {
@@ -531,7 +594,7 @@ pub(crate) fn layout_columns(
     let (end, pending, baseline) =
         layout_block_children(pass, tree, id, column, top, false, deferred);
     let flow_height = (end + pending.resolve() - top).max(Px::ZERO);
-    let target = Px((flow_height.0 + count - 1) / count);
+    let target = Px(flow_height.0.saturating_add(count - 1) / count);
 
     // Block-level children with frames, in document order: (id, border top, border bottom).
     let children: Vec<(NodeId, Px, Px)> = tree
@@ -539,7 +602,7 @@ pub(crate) fn layout_columns(
         .iter()
         .filter_map(|child| {
             let node = tree.get(*child)?;
-            if node.style.position == Position::Absolute || node.style.display.is_inline_level() {
+            if node.style.position.is_out_of_flow() || node.style.display.is_inline_level() {
                 return None;
             }
             let frame = tree.frame(*child)?;

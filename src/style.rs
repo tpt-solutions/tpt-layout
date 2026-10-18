@@ -82,6 +82,9 @@ impl Dimension {
 pub enum Display {
     #[default]
     Block,
+    /// The box and its subtree take no space, paint nothing, and are not paginated. Its
+    /// children are not laid out.
+    None,
     Inline,
     InlineBlock,
     Flex,
@@ -98,9 +101,52 @@ impl Display {
     }
 }
 
+/// How a table sizes its columns.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum TableLayout {
+    /// Columns follow the cells' max-content widths.
+    #[default]
+    Auto,
+    /// Columns follow the first row: a cell with a fixed width sets its column, and the remaining
+    /// width is shared equally by the other columns. Spanning cells do not set widths.
+    Fixed,
+}
+
+/// Whether inline content may wrap onto a new line.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum WhiteSpace {
+    /// Lines break at spaces when they run past the right edge.
+    #[default]
+    Normal,
+    /// Inline content stays on one line and may overflow. Spaces are handled as in `Normal`.
+    NoWrap,
+    /// As `NoWrap`, and a newline in the text starts a new line. Runs of spaces are kept. Blank
+    /// lines (two newlines in a row) are not kept. Tabs are not expanded.
+    Pre,
+    /// As `Pre`, but lines may still wrap at spaces when they run past the right edge.
+    PreWrap,
+}
+
+/// Horizontal alignment of inline content within a line. `Start` is the left edge in LTR and the
+/// right edge in RTL.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum TextAlign {
+    /// Takes the containing block's value. At the top of a tree the value is `Start`.
+    #[default]
+    Inherit,
+    Start,
+    Center,
+    End,
+    /// Spreads each line to the full width by widening its spaces. The last line of a run stays
+    /// at the start edge, as in CSS.
+    Justify,
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Direction {
+    /// Takes the parent's direction. At the top of a tree the direction is `Ltr`.
     #[default]
+    Inherit,
     Ltr,
     Rtl,
 }
@@ -111,6 +157,18 @@ pub enum Position {
     Static,
     Relative,
     Absolute,
+    /// Laid out as `Absolute`, but the containing block is the nearest positioned ancestor rather
+    /// than the viewport, since there is no viewport here.
+    Fixed,
+    /// Offset like `Relative`. There is no scroll model, so it never sticks.
+    Sticky,
+}
+
+impl Position {
+    /// Taken out of normal flow: absolutely positioned, or fixed.
+    pub fn is_out_of_flow(self) -> bool {
+        matches!(self, Position::Absolute | Position::Fixed)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -245,16 +303,38 @@ pub struct Tracks {
 }
 
 impl Tracks {
-    /// Panics if more than `MAX_TRACKS` tracks are given.
+    /// Panics if more than `MAX_TRACKS` tracks are given. Use [`Tracks::try_new`] to get an error.
     pub fn new(sizes: &[TrackSize]) -> Self {
-        assert!(sizes.len() <= MAX_TRACKS, "too many explicit tracks");
+        Self::try_new(sizes).expect("too many explicit tracks")
+    }
+
+    /// `repeat(count, pattern)`: the pattern written out `count` times. Returns `None` when the
+    /// result would have more than `MAX_TRACKS` tracks.
+    pub fn repeat(count: usize, pattern: &[TrackSize]) -> Option<Self> {
+        let total = count.checked_mul(pattern.len())?;
+        if total > MAX_TRACKS {
+            return None;
+        }
+        let mut sizes = [TrackSize::Auto; MAX_TRACKS];
+        for (index, size) in sizes.iter_mut().take(total).enumerate() {
+            *size = pattern[index % pattern.len()];
+        }
+        Self::try_new(&sizes[..total])
+    }
+
+    /// Like [`Tracks::new`], but returns `None` instead of panicking when more than `MAX_TRACKS`
+    /// tracks are given.
+    pub fn try_new(sizes: &[TrackSize]) -> Option<Self> {
+        if sizes.len() > MAX_TRACKS {
+            return None;
+        }
         let mut items = [TrackSize::Auto; MAX_TRACKS];
         items[..sizes.len()].copy_from_slice(sizes);
-        Tracks {
+        Some(Tracks {
             items,
             len: sizes.len() as u8,
             line_names: [0; MAX_TRACKS + 1],
-        }
+        })
     }
 
     /// Names the grid line before track `line` (0-based; `len` names the line after the last
@@ -279,6 +359,13 @@ pub struct GridTemplate {
     pub rows: Tracks,
     /// Row-major named areas. `0` is an empty cell.
     pub areas: [[u8; MAX_AREA_DIM]; MAX_AREA_DIM],
+    /// `repeat(auto-fill, <px>)` for columns: as many columns of this fixed px width as fit the
+    /// container, after any explicit columns. `None` when not used. Only fixed px widths are
+    /// supported.
+    pub auto_fill_columns: Option<Px>,
+    /// With `auto_fill_columns`, `auto-fit` behaviour: repeated columns that no item occupies
+    /// collapse to zero width. Ignored without `auto_fill_columns`.
+    pub auto_fit: bool,
 }
 
 /// A grid line reference for one side of an item's placement.
@@ -306,6 +393,19 @@ pub struct GridPlacement {
 pub struct BoxStyle {
     pub display: Display,
     pub direction: Direction,
+    /// Alignment of inline content within each line box.
+    pub text_align: TextAlign,
+    /// Indent of the first line of an inline run that starts its block. Applied to inline runs
+    /// only; block-level text leaves are not indented.
+    pub text_indent: Dimension,
+    /// Height of each line of an inline run. `auto` (the default) uses the natural height of the
+    /// pieces. A length adds half-leading above and below them. Only lengths are supported.
+    pub line_height: Dimension,
+    /// Whether inline content wraps. See [`WhiteSpace`].
+    pub white_space: WhiteSpace,
+    /// Width divided by height for a box whose height is `auto`. Applies in block flow only, and
+    /// only when the width is known. `None` or a non-positive value means no ratio.
+    pub aspect_ratio: Option<f32>,
     pub writing_mode: WritingMode,
     pub position: Position,
     pub box_sizing: BoxSizing,
@@ -339,6 +439,12 @@ pub struct BoxStyle {
     pub column_count: u16,
     /// Marks a table row to repeat at the top of each page it spans.
     pub table_header: bool,
+    /// Number of table columns a cell spans. `0` counts as `1`.
+    pub column_span: u16,
+    /// Number of table rows a cell spans. `0` counts as `1`.
+    pub row_span: u16,
+    /// How a table sizes its columns. See [`TableLayout`].
+    pub table_layout: TableLayout,
 
     // Flex container.
     pub flex_direction: FlexDirection,
@@ -376,7 +482,12 @@ impl Default for BoxStyle {
     fn default() -> Self {
         BoxStyle {
             display: Display::Block,
-            direction: Direction::Ltr,
+            direction: Direction::Inherit,
+            text_align: TextAlign::Inherit,
+            text_indent: Dimension::Length(Px::ZERO),
+            line_height: Dimension::Auto,
+            white_space: WhiteSpace::Normal,
+            aspect_ratio: None,
             writing_mode: WritingMode::Inherit,
             position: Position::Static,
             box_sizing: BoxSizing::ContentBox,
@@ -401,6 +512,9 @@ impl Default for BoxStyle {
             widows: 2,
             column_count: 0,
             table_header: false,
+            column_span: 1,
+            row_span: 1,
+            table_layout: TableLayout::Auto,
             flex_direction: FlexDirection::Row,
             flex_wrap: FlexWrap::NoWrap,
             justify_content: JustifyContent::FlexStart,

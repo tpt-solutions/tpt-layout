@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="112" viewBox="0 0 400 112">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<rect data-node="0" x="0" y="0" width="400" height="112" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<rect data-node="1" x="0" y="0" width="400" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<rect data-node="2" x="0" y="0" width="56" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<text x="0" y="16" font-family="sans-serif" font-size="16" fill="#222">Invoice</text>
+<rect data-node="3" x="0" y="16" width="400" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<rect data-node="4" x="0" y="16" width="136" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<text x="0" y="32" font-family="sans-serif" font-size="16" fill="#222">Bill</text>
+<text x="40" y="32" font-family="sans-serif" font-size="16" fill="#222">to:</text>
+<text x="72" y="32" font-family="sans-serif" font-size="16" fill="#222">Acme</text>
+<text x="112" y="32" font-family="sans-serif" font-size="16" fill="#222">Ltd</text>
+<rect data-node="5" x="0" y="32" width="400" height="64" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<rect data-node="6" x="0" y="0" width="0" height="0" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<rect data-node="7" x="0" y="32" width="186.67188" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<rect data-node="8" x="0" y="32" width="186.67188" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<rect data-node="9" x="0" y="32" width="32" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<text x="0" y="48" font-family="sans-serif" font-size="16" fill="#222">Item</text>
+<rect data-node="10" x="186.67188" y="32" width="80" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<rect data-node="11" x="186.67188" y="32" width="80" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<rect data-node="12" x="186.67188" y="32" width="24" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<text x="186.67188" y="48" font-family="sans-serif" font-size="16" fill="#222">Qty</text>
+<rect data-node="13" x="266.67188" y="32" width="133.32813" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<rect data-node="14" x="266.67188" y="32" width="133.32813" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<rect data-node="15" x="266.67188" y="32" width="40" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<text x="266.67188" y="48" font-family="sans-serif" font-size="16" fill="#222">Total</text>
+<rect data-node="16" x="0" y="0" width="0" height="0" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<rect data-node="17" x="0" y="48" width="186.67188" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<rect data-node="18" x="0" y="48" width="186.67188" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<rect data-node="19" x="0" y="48" width="56" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<text x="0" y="64" font-family="sans-serif" font-size="16" fill="#222">Widgets</text>
+<rect data-node="20" x="186.67188" y="48" width="80" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<rect data-node="21" x="186.67188" y="48" width="80" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<rect data-node="22" x="186.67188" y="48" width="8" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<text x="186.67188" y="64" font-family="sans-serif" font-size="16" fill="#222">3</text>
+<rect data-node="23" x="266.67188" y="48" width="133.32813" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<rect data-node="24" x="266.67188" y="48" width="133.32813" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<rect data-node="25" x="266.67188" y="48" width="16" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<text x="266.67188" y="64" font-family="sans-serif" font-size="16" fill="#222">36</text>
+<rect data-node="26" x="0" y="0" width="0" height="0" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<rect data-node="27" x="0" y="64" width="186.67188" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<rect data-node="28" x="0" y="64" width="186.67188" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<rect data-node="29" x="0" y="64" width="40" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<text x="0" y="80" font-family="sans-serif" font-size="16" fill="#222">Gears</text>
+<rect data-node="30" x="186.67188" y="64" width="80" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<rect data-node="31" x="186.67188" y="64" width="80" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<rect data-node="32" x="186.67188" y="64" width="8" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<text x="186.67188" y="80" font-family="sans-serif" font-size="16" fill="#222">2</text>
+<rect data-node="33" x="266.67188" y="64" width="133.32813" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<rect data-node="34" x="266.67188" y="64" width="133.32813" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<rect data-node="35" x="266.67188" y="64" width="16" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<text x="266.67188" y="80" font-family="sans-serif" font-size="16" fill="#222">14</text>
+<rect data-node="36" x="0" y="0" width="0" height="0" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<rect data-node="37" x="0" y="80" width="186.67188" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<rect data-node="38" x="0" y="80" width="186.67188" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<rect data-node="39" x="0" y="80" width="40" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<text x="0" y="96" font-family="sans-serif" font-size="16" fill="#222">Bolts</text>
+<rect data-node="40" x="186.67188" y="80" width="80" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<rect data-node="41" x="186.67188" y="80" width="80" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<rect data-node="42" x="186.67188" y="80" width="16" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<text x="186.67188" y="96" font-family="sans-serif" font-size="16" fill="#222">10</text>
+<rect data-node="43" x="266.67188" y="80" width="133.32813" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<rect data-node="44" x="266.67188" y="80" width="133.32813" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<rect data-node="45" x="266.67188" y="80" width="16" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<text x="266.67188" y="96" font-family="sans-serif" font-size="16" fill="#222">10</text>
+<rect data-node="46" x="0" y="96" width="400" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<rect data-node="47" x="0" y="96" width="104" height="16" fill="none" stroke="#8888cc" stroke-width="0.5"/>
+<text x="0" y="112" font-family="sans-serif" font-size="16" fill="#222">Total</text>
+<text x="48" y="112" font-family="sans-serif" font-size="16" fill="#222">due:</text>
+<text x="88" y="112" font-family="sans-serif" font-size="16" fill="#222">60</text>
+</svg>

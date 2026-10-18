@@ -1,7 +1,7 @@
 //! Arena-backed box tree. Nodes are addressed by [`NodeId`] and owned by [`BoxTree`].
 //!
-//! Slots are never reused, so a stale `NodeId` after `remove` resolves to `None` instead of
-//! silently aliasing a new node.
+//! Freed slots are reused, but each `NodeId` carries a generation. A stale `NodeId` (one whose node
+//! was removed) resolves to `None` instead of aliasing whatever now occupies the slot.
 //!
 //! Dirty tracking: any mutable access through [`BoxTree::get_mut`] and any structural edit marks
 //! the affected node dirty. [`crate::engine::relayout`] uses the flags to re-lay-out only the
@@ -13,17 +13,20 @@ use core::{fmt, ops::Range};
 use crate::{
     layout::ComputedLayout,
     px::Px,
-    style::{BoxStyle, Dimension, GridTemplate},
+    style::{BoxStyle, Dimension, Display, GridTemplate},
     text::LineBox,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct NodeId(u32);
+pub struct NodeId {
+    slot: u32,
+    generation: u32,
+}
 
 impl NodeId {
-    /// Arena slot index. Stable for the life of the tree.
+    /// Arena slot index. Stable while the node is alive; the slot may be reused after removal.
     pub fn index(self) -> usize {
-        self.0 as usize
+        self.slot as usize
     }
 }
 
@@ -102,6 +105,12 @@ impl std::error::Error for TreeError {}
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct BoxTree {
     slots: Vec<Option<BoxNode>>,
+    /// Generation of each slot. Bumped when a node is removed, so older ids no longer match.
+    generations: Vec<u32>,
+    /// Slots freed by `remove`, reused by the next insert.
+    free: Vec<u32>,
+    /// Root and constraints of the last full layout pass, so `relayout` can detect a change.
+    last_layout: Option<(NodeId, crate::engine::LayoutConstraints)>,
 }
 
 impl BoxTree {
@@ -149,9 +158,21 @@ impl BoxTree {
     }
 
     fn push(&mut self, style: BoxStyle, text: Option<String>) -> NodeId {
-        let index = u32::try_from(self.slots.len()).expect("box tree exceeds u32::MAX nodes");
-        let id = NodeId(index);
-        self.slots.push(Some(BoxNode {
+        let slot = match self.free.pop() {
+            Some(slot) => slot,
+            None => {
+                let slot =
+                    u32::try_from(self.slots.len()).expect("box tree exceeds u32::MAX nodes");
+                self.slots.push(None);
+                self.generations.push(0);
+                slot
+            }
+        };
+        let id = NodeId {
+            slot,
+            generation: self.generations[slot as usize],
+        };
+        self.slots[slot as usize] = Some(BoxNode {
             id,
             style,
             text,
@@ -165,28 +186,80 @@ impl BoxTree {
             dirty: true,
             replaced: false,
             laid_out: false,
-        }));
+        });
         id
     }
 
     pub fn get(&self, id: NodeId) -> Option<&BoxNode> {
-        self.slots.get(id.index())?.as_ref()
+        self.slots
+            .get(id.index())?
+            .as_ref()
+            .filter(|node| node.id == id)
     }
 
     /// Mutable access. Marks the node dirty, since the caller may change anything about it.
     pub fn get_mut(&mut self, id: NodeId) -> Option<&mut BoxNode> {
-        let node = self.slots.get_mut(id.index())?.as_mut()?;
+        let node = self.node_mut(id)?;
         node.dirty = true;
         Some(node)
     }
 
     /// Mutable access without marking dirty. For layout-internal writes only.
     fn node_mut(&mut self, id: NodeId) -> Option<&mut BoxNode> {
-        self.slots.get_mut(id.index())?.as_mut()
+        self.slots
+            .get_mut(id.index())?
+            .as_mut()
+            .filter(|node| node.id == id)
     }
 
     pub fn parent(&self, id: NodeId) -> Option<NodeId> {
         self.get(id)?.parent
+    }
+
+    /// Direction of `id` after inheritance: its own value, or its nearest ancestor's that is set.
+    /// `Ltr` at the top of the tree.
+    pub(crate) fn effective_direction(&self, id: NodeId) -> crate::style::Direction {
+        use crate::style::Direction;
+        let mut current = Some(id);
+        while let Some(node_id) = current {
+            let Some(node) = self.get(node_id) else {
+                break;
+            };
+            match node.style.direction {
+                Direction::Inherit => current = node.parent,
+                set => return set,
+            }
+        }
+        Direction::Ltr
+    }
+
+    /// `text-align` of `id` after inheritance. `Start` at the top of the tree.
+    pub(crate) fn effective_text_align(&self, id: NodeId) -> crate::style::TextAlign {
+        use crate::style::TextAlign;
+        let mut current = Some(id);
+        while let Some(node_id) = current {
+            let Some(node) = self.get(node_id) else {
+                break;
+            };
+            match node.style.text_align {
+                TextAlign::Inherit => current = node.parent,
+                set => return set,
+            }
+        }
+        TextAlign::Start
+    }
+
+    /// Children that take part in layout: every child except those with `display: none`. Used by
+    /// the layout passes; the public [`BoxTree::children`] still returns every child.
+    pub(crate) fn laid_children(&self, id: NodeId) -> Vec<NodeId> {
+        self.children(id)
+            .iter()
+            .copied()
+            .filter(|child| {
+                self.get(*child)
+                    .is_some_and(|node| node.style.display != Display::None)
+            })
+            .collect()
     }
 
     /// Children in document order. Empty for unknown ids.
@@ -229,11 +302,79 @@ impl BoxTree {
         let mut stack = Vec::new();
         stack.push(id);
         while let Some(current) = stack.pop() {
-            if let Some(node) = self.slots.get_mut(current.index()).and_then(Option::take) {
+            let slot = current.index();
+            if let Some(node) = self.slots.get_mut(slot).and_then(Option::take) {
                 stack.extend(node.children);
+                self.generations[slot] = self.generations[slot].wrapping_add(1);
+                self.free.push(current.slot);
             }
         }
         Ok(())
+    }
+
+    /// Detaches `id` from its parent without freeing it. The node and its subtree keep their ids
+    /// and can be re-attached with [`BoxTree::append_child`], [`BoxTree::insert_child_at`] or
+    /// [`BoxTree::insert_before`]. Detaching a root is a no-op.
+    pub fn detach(&mut self, id: NodeId) -> Result<(), TreeError> {
+        let parent = self.get(id).ok_or(TreeError::NotFound(id))?.parent;
+        let Some(parent) = parent else {
+            return Ok(());
+        };
+        if let Some(node) = self.get_mut(parent) {
+            node.children.retain(|child| *child != id);
+        }
+        if let Some(node) = self.get_mut(id) {
+            node.parent = None;
+        }
+        Ok(())
+    }
+
+    /// Inserts `child` (which must have no parent) at position `index` among `parent`'s children.
+    /// `index` past the end appends.
+    pub fn insert_child_at(
+        &mut self,
+        parent: NodeId,
+        index: usize,
+        child: NodeId,
+    ) -> Result<(), TreeError> {
+        self.append_child(parent, child)?;
+        let children = &mut self
+            .get_mut(parent)
+            .ok_or(TreeError::NotFound(parent))?
+            .children;
+        let last = children.len() - 1;
+        let child = children.remove(last);
+        children.insert(index.min(last), child);
+        Ok(())
+    }
+
+    /// Inserts `child` (which must have no parent) directly before `reference` under the same
+    /// parent. Fails with `NotFound` if `reference` is a root.
+    pub fn insert_before(&mut self, reference: NodeId, child: NodeId) -> Result<(), TreeError> {
+        let parent = self
+            .get(reference)
+            .ok_or(TreeError::NotFound(reference))?
+            .parent;
+        let parent = parent.ok_or(TreeError::NotFound(reference))?;
+        let index = self
+            .children(parent)
+            .iter()
+            .position(|c| *c == reference)
+            .ok_or(TreeError::NotFound(reference))?;
+        self.insert_child_at(parent, index, child)
+    }
+
+    /// Moves `child` (with its subtree) under `new_parent`, appended after its existing siblings.
+    /// Fails with `WouldCycle` if `new_parent` is inside `child`'s subtree.
+    pub fn reparent(&mut self, child: NodeId, new_parent: NodeId) -> Result<(), TreeError> {
+        self.get(child).ok_or(TreeError::NotFound(child))?;
+        self.get(new_parent)
+            .ok_or(TreeError::NotFound(new_parent))?;
+        if self.is_self_or_ancestor(child, new_parent) {
+            return Err(TreeError::WouldCycle);
+        }
+        self.detach(child)?;
+        self.append_child(new_parent, child)
     }
 
     /// Marks `id` dirty without reading or writing anything else.
@@ -243,6 +384,18 @@ impl BoxTree {
 
     pub(crate) fn is_dirty(&self, id: NodeId) -> bool {
         self.get(id).is_some_and(|n| n.dirty)
+    }
+
+    pub(crate) fn last_layout(&self) -> Option<(NodeId, crate::engine::LayoutConstraints)> {
+        self.last_layout
+    }
+
+    pub(crate) fn set_last_layout(
+        &mut self,
+        root: NodeId,
+        constraints: crate::engine::LayoutConstraints,
+    ) {
+        self.last_layout = Some((root, constraints));
     }
 
     pub(crate) fn clear_dirty(&mut self) {
@@ -263,6 +416,11 @@ impl BoxTree {
     }
 
     /// `root` and all its descendants, in depth-first order.
+    /// Ids of `root` and its descendants, in document order.
+    pub fn subtree_ids(&self, root: NodeId) -> Vec<NodeId> {
+        self.subtree(root)
+    }
+
     pub(crate) fn subtree(&self, root: NodeId) -> Vec<NodeId> {
         let mut out = Vec::new();
         let mut stack = Vec::new();

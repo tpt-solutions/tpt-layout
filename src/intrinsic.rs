@@ -9,9 +9,60 @@ use crate::{
     flow::Pass,
     px::Px,
     sizing::{clamp_inline, to_content, Sides},
-    style::{Dimension, Display, FlexDirection, Float, Position},
+    style::{Dimension, Display, FlexDirection, Float},
     tree::{BoxTree, NodeId},
 };
+
+/// Approximate min-content width of the content box of `id`: the widest unbreakable run, which is
+/// the widest word for text. A fixed `width` caps it, as `min-width: auto` requires. Flex rows
+/// sum their items, and other containers take the widest child.
+pub(crate) fn min_content(pass: &Pass, tree: &BoxTree, id: NodeId) -> Px {
+    let Some(node) = tree.get(id) else {
+        return Px::ZERO;
+    };
+    let style = &node.style;
+    let natural = match node.text.as_deref() {
+        Some(text) => pass
+            .measurer
+            .line_boxes(text, Px::ZERO)
+            .iter()
+            .map(|line| line.width)
+            .fold(Px::ZERO, |acc, w| acc.max(w)),
+        None => {
+            let children = tree.laid_children(id);
+            let items = children.iter().filter(|c| {
+                tree.get(**c).is_some_and(|n| {
+                    !n.style.position.is_out_of_flow() && n.style.float == Float::None
+                })
+            });
+            let row_flex = style.display == Display::Flex
+                && matches!(
+                    style.flex_direction,
+                    FlexDirection::Row | FlexDirection::RowReverse
+                );
+            if row_flex {
+                items.fold(Px::ZERO, |acc, c| acc + min_content_outer(pass, tree, *c))
+            } else {
+                items.fold(Px::ZERO, |acc, c| {
+                    acc.max(min_content_outer(pass, tree, *c))
+                })
+            }
+        }
+    };
+    match style.width {
+        Dimension::Length(w) => natural.min(w),
+        _ => natural,
+    }
+}
+
+/// Min-content width of a child including its own margins, padding and border.
+fn min_content_outer(pass: &Pass, tree: &BoxTree, id: NodeId) -> Px {
+    let Some(node) = tree.get(id) else {
+        return Px::ZERO;
+    };
+    let extra = Sides::of(&node.style, Px::ZERO).horizontal_extra();
+    min_content(pass, tree, id) + extra
+}
 
 /// Max-content width of the content box of `id`, honouring a fixed `width` and fixed min/max.
 pub(crate) fn max_content(pass: &Pass, tree: &BoxTree, id: NodeId) -> Px {
@@ -57,12 +108,12 @@ fn natural_content(pass: &Pass, tree: &BoxTree, id: NodeId) -> Px {
     let Some(node) = tree.get(id) else {
         return Px::ZERO;
     };
-    let children = tree.children(id);
+    let children = tree.laid_children(id);
     match node.style.display {
         Display::Flex => {
             let items = children.iter().filter(|c| {
                 tree.get(**c)
-                    .is_some_and(|n| n.style.position != Position::Absolute)
+                    .is_some_and(|n| !n.style.position.is_out_of_flow())
             });
             let gap = gap_px(node.style.column_gap);
             match node.style.flex_direction {
@@ -86,7 +137,7 @@ fn natural_content(pass: &Pass, tree: &BoxTree, id: NodeId) -> Px {
         Display::Table => children
             .iter()
             .map(|row| {
-                tree.children(*row)
+                tree.laid_children(*row)
                     .iter()
                     .fold(Px::ZERO, |acc, cell| acc + outer_width(pass, tree, *cell))
             })
@@ -102,12 +153,12 @@ fn natural_content(pass: &Pass, tree: &BoxTree, id: NodeId) -> Px {
             // Block container: inline runs sum, block children take the maximum.
             let mut best = Px::ZERO;
             let mut run = Px::ZERO;
-            for child in children {
+            for child in children.iter() {
                 let Some(child_node) = tree.get(*child) else {
                     continue;
                 };
                 let style = &child_node.style;
-                if style.position == Position::Absolute || style.float != Float::None {
+                if style.position.is_out_of_flow() || style.float != Float::None {
                     continue;
                 }
                 let width = outer_width(pass, tree, *child);

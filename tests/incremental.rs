@@ -114,3 +114,26 @@ fn appended_child_inside_a_boundary_matches_full_layout() {
 
     assert_eq!(incremental, full);
 }
+
+#[test]
+fn relayout_with_changed_constraints_does_full_pass() {
+    use tpt_layout::{
+        layout_document, relayout, BoxStyle, BoxTree, LayoutConstraints, LayoutContext, Px,
+    };
+    let m = tpt_layout::FixedAdvanceMeasurer::new(Px::from_px(8), Px::from_px(16), Px::from_px(12));
+    let ctx = LayoutContext::new(&m);
+    let mut tree = BoxTree::new();
+    let root = tree.insert(BoxStyle::default());
+    let narrow = LayoutConstraints {
+        width: Px::from_px(200),
+        height: None,
+    };
+    let wide = LayoutConstraints {
+        width: Px::from_px(400),
+        height: None,
+    };
+    let a = layout_document(&mut tree, root, narrow, &ctx).unwrap();
+    let b = relayout(&mut tree, root, wide, &ctx).unwrap();
+    assert_ne!(a.width, b.width);
+    assert_eq!(b.width, Px::from_px(400));
+}

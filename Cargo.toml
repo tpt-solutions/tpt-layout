@@ -2,6 +2,7 @@
 name = "tpt-layout"
 version = "1.0.0"
 edition = "2021"
+rust-version = "1.74"
 description = "Deterministic box, flow, and page layout engine (no_std + alloc)"
 publish = false
 

@@ -65,8 +65,7 @@ result always equals a full pass.
 ## Status
 
 Phases 0 to 5 are implemented with tests. Version 1.0.0 is set locally and not published. Known
-limits, and the one writing-mode case that is not done (a horizontal box inside a vertical box), are
-listed in [TODO.md](TODO.md).
+limits are listed in [TODO.md](TODO.md).
 
 ## Checks
 
@@ -82,7 +81,13 @@ the unsafe-code audit, and the wasm32 build. The wasm step needs
 
 To regenerate the golden layouts after an intended change: `UPDATE_GOLDEN=1 cargo test`.
 
+## Documentation
+
+- [docs/quickstart.md](docs/quickstart.md): build, lay out and paginate a tree.
+- [docs/text-measurer.md](docs/text-measurer.md): writing a `TextMeasurer` for real fonts.
+
 ## Examples
 
+- `cargo run --example quickstart`: the smallest program, from tree to positions.
 - `cargo run --example document`: block, flex and grid content, paginated to A4.
 - `cargo run --release --example incremental_bench`: full layout against a single-box relayout.

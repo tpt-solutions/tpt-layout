@@ -26,7 +26,10 @@ pub mod math;
 pub mod pagination;
 pub mod paint;
 pub mod px;
+pub mod snapshot;
 pub mod style;
+pub mod svg;
+pub mod templates;
 pub mod text;
 pub mod tree;
 
@@ -49,7 +52,8 @@ pub use px::Px;
 pub use style::{
     AlignContent, AlignItems, BoxSizing, BoxStyle, Break, Clear, Dimension, Direction, Display,
     FlexDirection, FlexWrap, Float, GridAutoFlow, GridLine, GridPlacement, GridTemplate,
-    JustifyContent, Overflow, Position, TrackSize, Tracks, WritingMode,
+    JustifyContent, Overflow, Position, TableLayout, TextAlign, TrackSize, Tracks, WhiteSpace,
+    WritingMode,
 };
 pub use text::{FixedAdvanceMeasurer, LineBox, TextMeasurer};
 pub use tree::{BoxNode, BoxTree, Fragment, NodeId, TreeError};
