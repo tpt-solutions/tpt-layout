@@ -1,0 +1,12 @@
+[package]
+name = "tpt-layout-cli"
+version = "0.1.0"
+edition = "2021"
+description = "Command-line tool: lay out a JSON box tree, and write SVG or layout JSON"
+publish = false
+
+# Not part of the core crate's workspace: the core stays dependency-free.
+[workspace]
+
+[dependencies]
+tpt-layout-spec = { path = "../spec" }

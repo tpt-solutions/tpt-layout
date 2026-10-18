@@ -159,12 +159,12 @@ Plan: `C:\Users\phill\.claude\plans\review-platform-for-bugs-optimized-allen.md`
 - [ ] `explain(node)`: why a box has its size. **Decision: defer.** Useful, but it needs a design for recording the constraint chain in every pass, and no one has asked for it yet.
 - [x] Layout diff: `snapshot::diff` compares a clone of the tree taken before an edit with the tree after it, reporting changed, added and removed nodes
 - [ ] `fit_to_pages(n)` helper. **Decision: do not build.** The meaning is not defined (scale, reflow or trim?), so it would be a guess. Build it when a specific use case says what it should do.
-- [ ] Serde for trees and results. **Decision: not in the core.** The core stays dependency-free, so serialization belongs in a separate crate that depends on serde. Not started.
+- [x] Serde: kept out of the core. `tools/spec` uses it for the JSON format.
 
 ### 6E. Adoption
 - [x] SVG debug renderer: `svg::SvgCanvas` implements `Canvas`, and `svg::render_svg` draws it. Text is drawn with its characters, inline and block-level. Block-level lines are also outlined. Vertical text is drawn one character per cell. `LineBox` now carries its byte range (a breaking change, noted in CHANGELOG). Example: `examples/svg_render.rs`
-- [ ] CLI `tpt-layout` (separate workspace crate): JSON tree in, layout JSON or SVG out. **Decision: a separate crate, so the core stays dependency-free.** Not started; it needs a JSON parser and so depends on the serde decision above.
-- [ ] wasm-bindgen playground (static page, GitHub Pages). **Decision: separate crate, later.** It needs wasm-bindgen, which the core must not depend on.
+- [x] CLI `tpt-layout-cli` in `tools/cli`: JSON in, SVG or layout JSON out. Built on the `tools/spec` crate (`tpt-layout-spec`), which uses serde. Separate from the core, as decided. Tests run in the `tools` CI job.
+- [x] wasm-bindgen playground in `tools/web`: a `wasm-bindgen` layer over the spec crate, and a single-page playground (`index.html`). Built and checked from Node; not checked in a browser. The `tools` CI job builds it for wasm32.
 - [x] Starter templates, golden-tested as SVG (`src/templates.rs`, `tests/templates.rs`, `examples/templates.rs`): invoice (table with a header row), dashboard (grid), navbar (flex), resume (two columns). Their text is inline, so the SVG shows the words.
 - [x] Also added: RTL page, vertical page, and a two-column newsletter (`tests/golden/templates/`). Vertical text stacks one character per cell in the SVG, which is exact only for the fixed-advance measurer.
 - [x] Report template with orphan and widow control, paginated with `Template::paginate` (`templates::report`; `examples/report.rs`; `tests/templates_report.rs`).

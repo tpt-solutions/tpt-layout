@@ -6,3 +6,8 @@
 .DS_Store
 Thumbs.db
 .claude/
+
+# Build output of the tools/ crates
+tools/*/target/
+tools/web/pkg/
+tools/cli/*.svg

@@ -56,6 +56,29 @@ jobs:
       - name: Build for wasm32 (no_std)
         run: cargo build --no-default-features --target wasm32-unknown-unknown
 
+  tools:
+    # The separate crates under tools/ (spec, cli and web). Each has its own lock file and is built
+    # on its own.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "tools/spec -> tools/spec/target
+tools/cli -> tools/cli/target
+tools/web -> tools/web/target"
+      - name: Test spec
+        run: cargo test --manifest-path tools/spec/Cargo.toml
+      - name: Test cli
+        run: cargo test --manifest-path tools/cli/Cargo.toml
+      - name: Test web
+        run: cargo test --manifest-path tools/web/Cargo.toml
+      - name: Build web for wasm32
+        run: cargo build --manifest-path tools/web/Cargo.toml --target wasm32-unknown-unknown --release
+
   unsafe-audit:
     runs-on: ubuntu-latest
     steps:
