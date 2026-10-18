@@ -1,0 +1,14 @@
+[package]
+name = "tpt-layout"
+version = "1.0.0"
+edition = "2021"
+description = "Deterministic box, flow, and page layout engine (no_std + alloc)"
+publish = false
+
+[features]
+default = []
+# Enables std-only conveniences (e.g. `std::error::Error` for `TreeError`).
+# The crate itself never requires std.
+std = []
+
+[dependencies]
