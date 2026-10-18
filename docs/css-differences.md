@@ -88,6 +88,15 @@ differences are deliberate or still open, and are tracked in [TODO.md](../TODO.m
 - Running headers and footers repeat the same nodes on every page. Per-page content such as page
   numbers is not supported.
 
+## Multi-column
+
+- `column-count` and `column-gap` balance content into columns.
+- A block of inline text is split between its lines at a column boundary, keeping orphans and widows.
+  Other children move whole, so a block text leaf, an inline element or an inline-block is never
+  split. A tall child can make the columns unbalanced.
+- A split paragraph keeps one box whose frame spans the columns it is in. Pagination does not split
+  a paragraph that was split across columns.
+
 ## Writing modes
 
 - `vertical-rl` and `vertical-lr` are supported, along with `sideways` modes.
