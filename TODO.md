@@ -142,7 +142,8 @@ Plan: `C:\Users\phill\.claude\plans\review-platform-for-bugs-optimized-allen.md`
 ### 6C. Tests and CI
 - [x] Test: `relayout` with changed constraints
 - [x] Test: `remove` then `relayout` matches a full layout
-- [ ] Tests still missing: inline-paragraph pagination, RTL plus vertical modes, percentages in nested roots, tables across pages, triple writing-mode nesting
+- [x] Tests added since: inline-paragraph pagination (`tests/paragraph_split.rs`), RTL inside a vertical box and triple writing-mode nesting (`tests/writing_nesting.rs`), tables across pages (`tests/templates_invoice.rs`).
+- [ ] Tests still missing: percentages in nested writing-mode roots
 - [x] Property tests: layout idempotence, and pagination gives each text box contiguous, disjoint line ranges from 0 (`tests/properties.rs`, seeded generator)
 - [x] Unit tests in `src/`: grid track spacing, aspect-ratio and length helpers, flex justify and gap, and `is_boundary` in the engine. Still missing for table and the rest of flex
 - [x] MSRV: `rust-version = "1.74"` in Cargo.toml. Verified locally by running the full test suite on 1.74; the `msrv` CI job does the same (it deletes the tracked Cargo.lock, which newer cargo writes in a format 1.74 cannot read)
